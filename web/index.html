@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book an appointment</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --surface: #fff; --text: #14181f; --muted: #5a6472; --line: #d9dee6;
+    --accent: #0b6b57; --accent-text: #fff; --danger: #b3261e; --danger-bg: #fce9e7;
+    --ok: #17703f; --ok-bg: #e4f4ea; --warn-bg: #fff4d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1318; --surface: #181d24; --text: #e9edf2; --muted: #9aa5b3; --line: #2b333d;
+      --accent: #3fc4a4; --accent-text: #04201a; --danger: #ff8a80; --danger-bg: #3a1c19;
+      --ok: #7be0a6; --ok-bg: #12301f; --warn-bg: #3a3112;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header, main { max-width: 44rem; margin-inline: auto; padding-inline: 1rem; }
+  header { padding-block: 2rem 0.5rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.15rem; margin: 0; }
+  h3 { font-size: .85rem; margin: 1.25rem 0 .4rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: .25rem 0; }
+  .muted { color: var(--muted); }
+  section { background: var(--surface); border: 1px solid var(--line); border-radius: .75rem; padding: 1.25rem; margin-block: 1rem; }
+  .bar { display: flex; flex-wrap: wrap; gap: .75rem 1rem; align-items: end; justify-content: space-between; }
+  .bar > div { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+  label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .25rem; }
+  input, select { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: .5rem; padding: .6rem .7rem; min-height: 2.75rem; }
+  .bar select { width: auto; min-width: 12rem; }
+  button { font: inherit; font-weight: 600; min-height: 2.75rem; padding: .55rem 1rem; border-radius: .5rem; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .55; cursor: not-allowed; }
+  button.danger { color: var(--danger); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  ul.slots { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+  .slot { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; border: 1px solid var(--line); border-radius: .6rem; padding: .7rem .85rem; }
+  .slot-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .slot-meta { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: .75rem; font-weight: 700; padding: .15rem .55rem; border-radius: 999px; border: 1px solid currentColor; }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); }
+  .badge.off { color: var(--muted); }
+  .badge.bad { color: var(--danger); background: var(--danger-bg); }
+  .notice { padding: .7rem .9rem; border-radius: .5rem; background: var(--warn-bg); margin-top: .75rem; }
+  .notice[hidden] { display: none; }
+  dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; margin: 1rem 0; }
+  dl.facts dt { color: var(--muted); }
+  dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: end; }
+  .row > .grow { flex: 1 1 14rem; }
+  .actions { display: flex; gap: .5rem; justify-content: flex-end; flex-wrap: wrap; margin-top: 1rem; }
+
+  dialog { width: min(28rem, calc(100vw - 2rem)); background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: .85rem; padding: 1.25rem; }
+  dialog::backdrop { background: rgb(0 0 0 / .5); overflow: hidden; overscroll-behavior: contain; }
+  dialog:modal { overscroll-behavior: contain; }
+  .field { margin-top: 1rem; }
+  .error-msg { display: none; color: var(--danger); font-size: .875rem; margin-top: .25rem; }
+  input:user-invalid { border-color: var(--danger); background: var(--danger-bg); }
+  input:user-invalid + .error-msg { display: block; }
+  .form-error { color: var(--danger); background: var(--danger-bg); padding: .6rem .8rem; border-radius: .5rem; margin-top: 1rem; }
+  .form-error[hidden] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Book an appointment</h1>
+  <p class="muted">Choose a time with one of our providers. You'll get a confirmation straight away.</p>
+</header>
+
+<main>
+  <section aria-labelledby="slots-h">
+    <div class="bar">
+      <h2 id="slots-h">Available times</h2>
+      <div>
+        <div>
+          <label for="provider">Provider</label>
+          <select id="provider"><option value="">All providers</option></select>
+        </div>
+        <button id="refresh" type="button">Refresh</button>
+      </div>
+    </div>
+    <p id="slots-status" class="muted" role="status" aria-live="polite"></p>
+    <div id="notice" class="notice" role="alert" hidden></div>
+    <div id="slots"></div>
+  </section>
+
+  <section id="confirmation" aria-labelledby="conf-h" tabindex="-1" hidden>
+    <h2 id="conf-h">Your booking</h2>
+    <p><span id="conf-badge" class="badge"></span></p>
+    <dl class="facts">
+      <dt>Booking ID</dt><dd><code id="conf-id"></code></dd>
+      <dt>Provider</dt><dd id="conf-provider"></dd>
+      <dt>When</dt><dd id="conf-when"></dd>
+      <dt>Name</dt><dd id="conf-name"></dd>
+      <dt>Email</dt><dd id="conf-email"></dd>
+    </dl>
+    <p class="muted">Keep your booking ID: it's how you look this booking up later.</p>
+    <div class="actions"><button id="cancel-booking" type="button" class="danger">Cancel this booking</button></div>
+    <p id="conf-error" class="form-error" role="alert" hidden></p>
+  </section>
+
+  <section aria-labelledby="lookup-h">
+    <h2 id="lookup-h">Already booked?</h2>
+    <form id="lookup" class="row" style="margin-top:.75rem">
+      <div class="grow">
+        <label for="lookup-id">Booking ID</label>
+        <input id="lookup-id" name="id" required autocomplete="off" spellcheck="false" maxlength="64">
+      </div>
+      <button type="submit">Look up</button>
+    </form>
+    <p id="lookup-status" class="muted" role="status" aria-live="polite"></p>
+  </section>
+</main>
+
+<dialog id="book" aria-labelledby="book-title">
+  <form id="book-form" method="dialog">
+    <h2 id="book-title">Book this time</h2>
+    <p id="book-summary" class="muted"></p>
+
+    <div class="field">
+      <label for="name">Full name</label>
+      <input id="name" name="name" required autocomplete="name" maxlength="200" autofocus aria-errormessage="name-error">
+      <div id="name-error" class="error-msg">Please enter your name.</div>
+    </div>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" required autocomplete="email" inputmode="email" maxlength="254" aria-errormessage="email-error">
+      <div id="email-error" class="error-msg">Please enter a valid email address.</div>
+    </div>
+
+    <p id="book-error" class="form-error" role="alert" hidden></p>
+
+    <div class="actions">
+      <button type="submit" value="cancel" formmethod="dialog" formnovalidate>Cancel</button>
+      <button id="book-submit" type="submit" value="book" class="primary">Confirm booking</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+'use strict';
+const $ = (sel) => document.querySelector(sel);
+const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+const zoneFmt = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' });
+const zoneName = (d) => zoneFmt.formatToParts(d).find((p) => p.type === 'timeZoneName')?.value ?? '';
+const whenText = (s) => `${dateFmt.format(new Date(s.start))}, ${timeFmt.format(new Date(s.start))} – ${timeFmt.format(new Date(s.end))} ${zoneName(new Date(s.start))}`;
+
+let slots = [];
+const slotById = new Map();
+
+/** Thin fetch wrapper over the same-origin proxy. Never throws on HTTP errors, only on network failure. */
+async function api(path, { method = 'GET', body, headers } = {}) {
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers: { ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => null);
+  return { ok: res.ok, status: res.status, data, retryAfter: Number(res.headers.get('retry-after')) || null };
+}
+
+/* ---------- slots ---------- */
+
+let wakeTimer;
+async function loadSlots() {
+  const status = $('#slots-status');
+  status.textContent = 'Loading available times…';
+  clearTimeout(wakeTimer);
+  // The free API host sleeps when idle; tell people why the first load is slow.
+  wakeTimer = setTimeout(() => { status.textContent = 'Still connecting. The booking service is waking up and can take up to a minute…'; }, 4000);
+  try {
+    const r = await api('/slots');
+    clearTimeout(wakeTimer);
+    if (!r.ok) throw new Error(r.data?.error ?? `HTTP ${r.status}`);
+    slots = r.data.slots;
+    slotById.clear();
+    for (const s of slots) slotById.set(s.id, s);
+    renderProviders();
+    renderSlots();
+  } catch {
+    clearTimeout(wakeTimer);
+    $('#slots').replaceChildren();
+    status.textContent = "We couldn't load the available times. Check your connection and press Refresh.";
+  }
+}
+
+function renderProviders() {
+  const select = $('#provider');
+  const current = select.value;
+  const providers = [...new Set(slots.map((s) => s.provider))].sort();
+  select.replaceChildren(new Option('All providers', ''), ...providers.map((p) => new Option(p, p)));
+  select.value = providers.includes(current) ? current : '';
+}
+
+function renderSlots() {
+  const provider = $('#provider').value;
+  const now = Date.now();
+  const visible = slots.filter((s) => !provider || s.provider === provider);
+  const status = $('#slots-status');
+  const container = $('#slots');
+  container.replaceChildren();
+
+  const open = visible.filter((s) => s.available && new Date(s.start).getTime() > now).length;
+  status.textContent = visible.length === 0 ? 'No times to show.' : `${open} of ${visible.length} times available.`;
+
+  let currentDay = '';
+  let list;
+  for (const s of visible) {
+    const day = dateFmt.format(new Date(s.start));
+    if (day !== currentDay) {
+      currentDay = day;
+      const h = document.createElement('h3');
+      h.textContent = day;
+      list = document.createElement('ul');
+      list.className = 'slots';
+      container.append(h, list);
+    }
+    const started = new Date(s.start).getTime() <= now;
+    const li = document.createElement('li');
+    li.className = 'slot';
+
+    const time = document.createElement('span');
+    time.className = 'slot-time';
+    time.textContent = `${timeFmt.format(new Date(s.start))} – ${timeFmt.format(new Date(s.end))}`;
+
+    const meta = document.createElement('span');
+    meta.className = 'slot-meta';
+    const who = document.createElement('span');
+    who.textContent = s.provider;
+    const badge = document.createElement('span');
+    badge.className = 'badge ' + (started ? 'off' : s.available ? 'ok' : 'bad');
+    badge.textContent = started ? 'Passed' : s.available ? 'Available' : 'Booked';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'primary';
+    btn.textContent = 'Book';
+    btn.disabled = started || !s.available;
+    btn.setAttribute('aria-label', `Book ${s.provider}, ${whenText(s)}`);
+    btn.addEventListener('click', () => openBooking(s));
+    meta.append(who, badge, btn);
+
+    li.append(time, meta);
+    list.append(li);
+  }
+}
+
+function notice(text) {
+  const el = $('#notice');
+  el.textContent = text;
+  el.hidden = !text;
+}
+
+/* ---------- booking dialog ---------- */
+
+const dialog = $('#book');
+const form = $('#book-form');
+let attempt = null; // { slot, key, bodyJson }: one Idempotency-Key per distinct intent
+
+function openBooking(slot) {
+  attempt = { slot, key: null, bodyJson: null };
+  $('#book-title').textContent = `Book with ${slot.provider}`;
+  $('#book-summary').textContent = whenText(slot);
+  showFormError('');
+  setBusy(false);
+  dialog.showModal();
+}
+
+function showFormError(text) {
+  const el = $('#book-error');
+  el.textContent = text;
+  el.hidden = !text;
+}
+
+function setBusy(busy, label) {
+  const btn = $('#book-submit');
+  btn.disabled = busy;
+  btn.textContent = label ?? (busy ? 'Booking…' : 'Confirm booking');
+  form.setAttribute('aria-busy', String(busy));
+}
+
+let countdown;
+function lockForRetryAfter(seconds) {
+  clearInterval(countdown);
+  let left = seconds;
+  const tick = () => {
+    if (left <= 0) { clearInterval(countdown); setBusy(false); showFormError(''); return; }
+    setBusy(true, `Try again in ${left}s`);
+    left -= 1;
+  };
+  tick();
+  countdown = setInterval(tick, 1000);
+}
+
+form.addEventListener('submit', async (event) => {
+  // The Cancel button uses method="dialog": let the browser close the dialog natively.
+  if (event.submitter?.value === 'cancel') return;
+  event.preventDefault(); // we close it ourselves, only on success
+
+  const body = { slot_id: attempt.slot.id, name: $('#name').value.trim(), email: $('#email').value.trim() };
+  const bodyJson = JSON.stringify(body);
+  // Reuse the key only while the request is identical: a retry after a timeout then
+  // cannot double-book, but an edited form is a new intent and needs a fresh key.
+  if (attempt.key === null || attempt.bodyJson !== bodyJson) {
+    attempt.key = crypto.randomUUID();
+    attempt.bodyJson = bodyJson;
+  }
+
+  showFormError('');
+  setBusy(true);
+  let r;
+  try {
+    r = await api('/bookings', { method: 'POST', body, headers: { 'idempotency-key': attempt.key } });
+  } catch {
+    setBusy(false);
+    showFormError("We couldn't confirm whether your booking went through. Press Confirm booking again: retrying is safe and won't create a duplicate.");
+    return;
+  }
+
+  if (r.status === 201) {
+    dialog.close();
+    notice('');
+    showConfirmation(r.data);
+    loadSlots();
+  } else if (r.status === 409) {
+    dialog.close();
+    notice('Sorry, that time was just booked by someone else. Please pick another.');
+    loadSlots();
+  } else if (r.status === 429) {
+    showFormError(`Too many attempts for this email. Please wait ${r.retryAfter ?? 60} seconds.`);
+    lockForRetryAfter(r.retryAfter ?? 60);
+  } else if (r.status >= 500) {
+    setBusy(false);
+    showFormError('The booking service had a problem. Press Confirm booking again: retrying is safe.');
+  } else {
+    setBusy(false);
+    showFormError(r.data?.error ? capitalize(r.data.error) + '.' : `Something went wrong (HTTP ${r.status}).`);
+  }
+});
+
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+dialog.addEventListener('close', () => {
+  clearInterval(countdown);
+  form.reset();
+});
+
+/* ---------- confirmation / lookup / cancel ---------- */
+
+let shown = null;
+function showConfirmation(b) {
+  shown = b;
+  const s = slotById.get(b.slot_id);
+  $('#conf-id').textContent = b.id;
+  $('#conf-provider').textContent = s ? s.provider : '(unknown provider)';
+  $('#conf-when').textContent = s ? whenText(s) : b.slot_id;
+  $('#conf-name').textContent = b.name;
+  $('#conf-email').textContent = b.email;
+  const badge = $('#conf-badge');
+  badge.textContent = b.status === 'confirmed' ? 'Confirmed' : 'Cancelled';
+  badge.className = 'badge ' + (b.status === 'confirmed' ? 'ok' : 'bad');
+  $('#cancel-booking').hidden = b.status !== 'confirmed';
+  $('#conf-error').hidden = true;
+  const sec = $('#confirmation');
+  sec.hidden = false;
+  sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  sec.focus({ preventScroll: true });
+}
+
+$('#cancel-booking').addEventListener('click', async () => {
+  if (!shown || !confirm('Cancel this booking? The time will be released for others.')) return;
+  const err = $('#conf-error');
+  err.hidden = true;
+  try {
+    const r = await api(`/bookings/${encodeURIComponent(shown.id)}`, { method: 'DELETE' });
+    if (r.ok) { showConfirmation(r.data); loadSlots(); }
+    else { err.textContent = r.data?.error ? capitalize(r.data.error) + '.' : 'Could not cancel.'; err.hidden = false; }
+  } catch {
+    err.textContent = "Couldn't reach the booking service. Please try again.";
+    err.hidden = false;
+  }
+});
+
+$('#lookup').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const status = $('#lookup-status');
+  const id = $('#lookup-id').value.trim();
+  status.textContent = 'Looking up…';
+  try {
+    const r = await api(`/bookings/${encodeURIComponent(id)}`);
+    if (r.ok) { status.textContent = ''; showConfirmation(r.data); }
+    else status.textContent = r.status === 404 ? 'No booking found with that ID.' : 'Something went wrong. Please try again.';
+  } catch {
+    status.textContent = "Couldn't reach the booking service. Please try again.";
+  }
+});
+
+$('#provider').addEventListener('change', renderSlots);
+$('#refresh').addEventListener('click', () => { notice(''); loadSlots(); });
+
+loadSlots();
+</script>
+</body>
+</html>
