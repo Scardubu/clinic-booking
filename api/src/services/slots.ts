@@ -1,12 +1,15 @@
 import { pool } from '../db.js';
-import { ApiError, isValidUuid } from '../validation.js';
+import { ApiError } from '../validation.js';
 
 export interface SlotDTO {
   id: string;
+  provider: string;
   doctorName: string;
   doctor_name: string;
+  start: string;
   startTime: string;
   start_time: string;
+  end: string;
   endTime: string;
   end_time: string;
   available: boolean;
@@ -19,13 +22,17 @@ export function mapSlotRow(row: any): SlotDTO {
   const startIso = new Date(row.start_time).toISOString();
   const endIso = new Date(row.end_time).toISOString();
   const isAvailable = Boolean(row.is_available);
+  const provider = row.provider || row.doctor_name || 'Clinic Physician';
 
   return {
-    id: row.id,
-    doctorName: row.doctor_name,
-    doctor_name: row.doctor_name,
+    id: String(row.id),
+    provider,
+    doctorName: provider,
+    doctor_name: provider,
+    start: startIso,
     startTime: startIso,
     start_time: startIso,
+    end: endIso,
     endTime: endIso,
     end_time: endIso,
     available: isAvailable,
@@ -35,32 +42,44 @@ export function mapSlotRow(row: any): SlotDTO {
   };
 }
 
-export async function listSlots(onlyAvailable = true): Promise<SlotDTO[]> {
-  const sql = onlyAvailable
-    ? `SELECT id, doctor_name, start_time, end_time, is_available
-       FROM slots
-       WHERE is_available = TRUE
-       ORDER BY start_time ASC, id ASC`
-    : `SELECT id, doctor_name, start_time, end_time, is_available
-       FROM slots
-       ORDER BY start_time ASC, id ASC`;
+export async function listSlots(provider?: string, onlyAvailable = false): Promise<SlotDTO[]> {
+  const values: any[] = [];
+  const filters: string[] = [];
 
-  const { rows } = await pool.query(sql);
+  if (provider && provider.trim()) {
+    values.push(provider.trim());
+    filters.push(`(provider = $${values.length} OR doctor_name = $${values.length})`);
+  }
+
+  if (onlyAvailable) {
+    filters.push('is_available = TRUE');
+  }
+
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+  const sql = `
+    SELECT id, COALESCE(provider, doctor_name) AS provider, doctor_name, start_time, end_time, is_available
+    FROM slots
+    ${whereClause}
+    ORDER BY start_time ASC, id ASC
+  `;
+
+  const { rows } = await pool.query(sql, values);
   return rows.map(mapSlotRow);
 }
 
 export async function getSlotById(slotId: string): Promise<SlotDTO> {
-  if (!isValidUuid(slotId)) {
-    throw new ApiError(400, 'INVALID_SLOT_ID', 'Slot ID must be a valid UUID.');
+  const cleanId = String(slotId || '').trim();
+  if (!cleanId) {
+    throw new ApiError(404, 'SLOT_NOT_FOUND', "The slot doesn't exist");
   }
   const { rows, rowCount } = await pool.query(
-    `SELECT id, doctor_name, start_time, end_time, is_available
+    `SELECT id, COALESCE(provider, doctor_name) AS provider, doctor_name, start_time, end_time, is_available
      FROM slots
      WHERE id = $1`,
-    [slotId]
+    [cleanId]
   );
   if (!rowCount || !rows[0]) {
-    throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot not found.');
+    throw new ApiError(404, 'SLOT_NOT_FOUND', "The slot doesn't exist");
   }
   return mapSlotRow(rows[0]);
 }

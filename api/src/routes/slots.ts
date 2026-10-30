@@ -5,8 +5,9 @@ export const slotsRouter = Router();
 
 slotsRouter.get('/', async (req, res, next) => {
   try {
-    const showAll = req.query.all === 'true' || req.query.available === 'false';
-    const slots = await listSlots(!showAll);
+    const provider = req.query.provider as string | undefined;
+    const onlyAvailable = req.query.available === 'true';
+    const slots = await listSlots(provider, onlyAvailable);
     res.status(200).json({
       slots,
       data: slots,

@@ -54,17 +54,30 @@ export function resetRateLimiterMemory(): void {
 }
 
 export function bookingRateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
-  const forwarded = req.headers['x-forwarded-for'];
-  const ip =
-    (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip) || 'unknown-ip';
+  const body =
+    req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? (req.body as any) : {};
+  const rawEmail =
+    body.email || body.patientEmail || body.patient_email || (body.patient && body.patient.email);
 
-  const customActor =
-    (req.headers['x-client-id'] as string) ||
-    (req.headers['x-rate-limit-key'] as string) ||
-    ip;
+  let bucketKey: string;
+  if (typeof rawEmail === 'string' && rawEmail.trim()) {
+    bucketKey = `email:${rawEmail.trim().toLowerCase()}`;
+  } else {
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip =
+      (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip) || 'unknown-ip';
+    const customActor =
+      (req.headers['x-client-id'] as string) ||
+      (req.headers['x-rate-limit-key'] as string) ||
+      ip;
+    bucketKey = `actor:${customActor}`;
+  }
 
-  const bucketKey = `booking:${customActor}`;
-  const status = evaluateSlidingWindow(bucketKey);
+  const status = evaluateSlidingWindow(
+    bucketKey,
+    config.rateLimitWindowMs,
+    config.rateLimitMaxRequests
+  );
 
   res.setHeader('X-RateLimit-Limit', String(config.rateLimitMaxRequests));
   res.setHeader('X-RateLimit-Remaining', String(status.remaining));
@@ -76,7 +89,7 @@ export function bookingRateLimitMiddleware(req: Request, res: Response, next: Ne
       new ApiError(
         429,
         'RATE_LIMIT_EXCEEDED',
-        `Rate limit exceeded. Try again in ${status.retryAfterSeconds} seconds.`
+        `Too many attempts for this email`
       )
     );
   }

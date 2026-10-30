@@ -13,12 +13,12 @@ export const bookingsRouter = Router();
 bookingsRouter.get('/', async (req, res, next) => {
   try {
     const patientEmail =
+      (req.query.email as string) ||
       (req.query.patientEmail as string) ||
       (req.query.patient_email as string) ||
-      (req.query.email as string) ||
       undefined;
     const status = (req.query.status as string) || undefined;
-    const limit = req.query.limit ? Number(req.query.limit) : 10;
+    const limit = req.query.limit as string | undefined;
     const page = req.query.page ? Number(req.query.page) : 1;
     const offset = req.query.offset !== undefined ? Number(req.query.offset) : undefined;
     const cursor = (req.query.cursor as string) || undefined;

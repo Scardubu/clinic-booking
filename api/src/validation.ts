@@ -54,21 +54,19 @@ export function validateCreateBooking(body: unknown): CreateBookingInput {
   const errors: string[] = [];
 
   if (!slotId) {
-    errors.push('slotId is required.');
-  } else if (!isValidUuid(slotId)) {
-    errors.push('slotId must be a valid UUID.');
+    errors.push('slot_id is required.');
   }
 
   if (!patientName) {
-    errors.push('patientName is required.');
-  } else if (patientName.length < 2 || patientName.length > 120) {
-    errors.push('patientName must be between 2 and 120 characters.');
+    errors.push('name is required.');
+  } else if (patientName.length < 1 || patientName.length > 120) {
+    errors.push('name must be between 1 and 120 characters.');
   }
 
   if (!patientEmail) {
-    errors.push('patientEmail is required.');
+    errors.push('email is required.');
   } else if (!EMAIL_REGEX.test(patientEmail) || patientEmail.length > 255) {
-    errors.push('patientEmail must be a valid email address.');
+    errors.push('email must be a valid email address.');
   }
 
   let patientPhone: string | undefined;

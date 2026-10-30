@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <title>Koya Clinic — Appointment Booking Portal</title>
   <style>
     :root {
@@ -232,7 +234,12 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const API_BASE = (params.get('apiBase') || '/api').replace(/\/$/, '');
-    const API_KEY = params.get('apiKey') || '';
+    const API_KEY =
+      params.get('apiKey') ||
+      (typeof localStorage !== 'undefined' ? localStorage.getItem('clinic_api_key') : '') ||
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c'
+        : '');
 
     let selectedSlotId = '';
     let nextCursor = null;
@@ -250,13 +257,26 @@
       el.textContent = message;
     }
 
+    function getErrorMessage(res, data) {
+      if (res && (res.status === 500 || res.status === 502)) {
+        return 'Unable to reach booking server. Please check API configuration.';
+      }
+      return (
+        data?.error?.message ||
+        data?.message ||
+        data?.details ||
+        (res ? `Request failed (HTTP ${res.status})` : 'Unable to reach booking server. Please check API configuration.')
+      );
+    }
+
     async function fetchSlots() {
       const grid = document.getElementById('slotsGrid');
       try {
         const res = await fetch(`${API_BASE}/slots`, { headers: buildHeaders() });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Unable to load slots');
-        const slots = data.slots || data.data || [];
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
+        const allSlots = Array.isArray(data.slots) ? data.slots : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
+        const slots = allSlots.filter(s => s.available !== false && s.is_available !== false);
 
         if (slots.length === 0) {
           grid.innerHTML = '<p style="color:var(--muted);">No available slots remaining.</p>';
@@ -264,20 +284,20 @@
         }
 
         grid.innerHTML = slots.map(s => {
-          const dt = new Date(s.startTime || s.start_time).toLocaleString(undefined, {
+          const dt = new Date(s.start || s.startTime || s.start_time).toLocaleString(undefined, {
             weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
           });
           const sel = s.id === selectedSlotId ? 'selected' : '';
           return `
             <div class="slot-card ${sel}" onclick="chooseSlot('${s.id}')">
               <div class="slot-time">${dt}</div>
-              <div class="slot-doctor">${s.doctorName || s.doctor_name}</div>
+              <div class="slot-doctor">${s.provider || s.doctorName || s.doctor_name}</div>
               <div class="mono" style="margin-top:0.25rem;">${s.id.slice(0, 8)}…</div>
             </div>
           `;
         }).join('');
       } catch (err) {
-        grid.innerHTML = `<p style="color:var(--danger);">${err.message}</p>`;
+        grid.innerHTML = `<p style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
       }
     }
 
@@ -293,12 +313,23 @@
       const btn = document.getElementById('bookBtn');
       btn.disabled = true;
 
+      const slotVal = document.getElementById('slotId').value.trim();
+      const nameVal = document.getElementById('patientName').value.trim();
+      const emailVal = document.getElementById('patientEmail').value.trim();
+      const phoneVal = document.getElementById('patientPhone').value.trim();
+      const reasonVal = document.getElementById('reason').value.trim();
+
       const body = {
-        slotId: document.getElementById('slotId').value.trim(),
-        patientName: document.getElementById('patientName').value.trim(),
-        patientEmail: document.getElementById('patientEmail').value.trim(),
-        patientPhone: document.getElementById('patientPhone').value.trim() || undefined,
-        reason: document.getElementById('reason').value.trim() || undefined,
+        slot_id: slotVal,
+        slotId: slotVal,
+        name: nameVal,
+        patientName: nameVal,
+        patient_name: nameVal,
+        email: emailVal,
+        patientEmail: emailVal,
+        patient_email: emailVal,
+        patientPhone: phoneVal || undefined,
+        reason: reasonVal || undefined,
       };
 
       try {
@@ -307,8 +338,8 @@
           headers: buildHeaders({ 'Idempotency-Key': currentIdempotencyKey }),
           body: JSON.stringify(body),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Booking request failed');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
 
         const b = data.booking || data;
         notify(`Appointment confirmed! Reference ID: ${b.id}`, 'success');
@@ -316,9 +347,9 @@
         document.getElementById('confirmationBox').style.display = 'block';
         document.getElementById('confirmationBody').innerHTML = `
           <div><strong>Booking ID:</strong> <span class="mono">${b.id}</span></div>
-          <div><strong>Patient:</strong> ${b.patientName} (${b.patientEmail})</div>
-          <div><strong>Doctor:</strong> ${b.slot?.doctorName || 'Clinic Physician'}</div>
-          <div><strong>Appointment Time:</strong> ${b.slot ? new Date(b.slot.startTime).toLocaleString() : b.slotId}</div>
+          <div><strong>Patient:</strong> ${b.name || b.patientName} (${b.email || b.patientEmail})</div>
+          <div><strong>Doctor:</strong> ${b.slot?.provider || b.slot?.doctorName || 'Clinic Physician'}</div>
+          <div><strong>Appointment Time:</strong> ${b.slot ? new Date(b.slot.start || b.slot.startTime).toLocaleString() : (b.slot_id || b.slotId)}</div>
           <div><strong>Status:</strong> <span style="color:var(--emerald);">${b.status}</span></div>
         `;
 
@@ -328,7 +359,7 @@
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
-        notify(err.message, 'error');
+        notify(err.message || 'Unable to reach booking server. Please check API configuration.', 'error');
       } finally {
         btn.disabled = false;
       }
@@ -342,17 +373,17 @@
         const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
           headers: buildHeaders(),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Booking not found');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
         const b = data.booking || data;
         out.innerHTML = `
           <div style="padding:0.65rem; border:1px solid var(--border); border-radius:8px;">
-            <div><strong>${b.patientName}</strong> — <span class="mono">${b.status}</span></div>
-            <div class="mono">Email: ${b.patientEmail} | Slot: ${b.slotId}</div>
+            <div><strong>${b.name || b.patientName}</strong> — <span class="mono">${b.status}</span></div>
+            <div class="mono">Email: ${b.email || b.patientEmail} | Slot: ${b.slot_id || b.slotId}</div>
           </div>
         `;
       } catch (err) {
-        out.innerHTML = `<span style="color:var(--danger);">${err.message}</span>`;
+        out.innerHTML = `<span style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</span>`;
       }
     }
 
@@ -369,18 +400,18 @@
       const listEl = document.getElementById('bookingsList');
       const email = document.getElementById('searchEmail').value.trim();
       const qs = new URLSearchParams({ limit: '5' });
-      if (email) qs.set('patientEmail', email);
+      if (email) qs.set('email', email);
       if (cursor) qs.set('cursor', cursor);
 
       try {
         const res = await fetch(`${API_BASE}/bookings?${qs.toString()}`, {
           headers: buildHeaders(),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Failed to load bookings');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
 
-        const items = data.bookings || [];
-        nextCursor = data.nextCursor || null;
+        const items = Array.isArray(data.bookings) ? data.bookings : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
+        nextCursor = data.nextCursor || data.next_cursor || null;
         document.getElementById('nextCursorBtn').style.display = nextCursor ? 'inline-block' : 'none';
         document.getElementById('paginationStats').textContent = `Showing ${items.length} of ${data.total ?? items.length} total`;
 
@@ -392,16 +423,16 @@
         listEl.innerHTML = items.map(b => `
           <div class="booking-item">
             <div>
-              <div><strong>${b.patientName}</strong> <span class="mono">[${b.status}]</span></div>
+              <div><strong>${b.name || b.patientName}</strong> <span class="mono">[${b.status}]</span></div>
               <div class="mono">${b.id}</div>
             </div>
-            ${b.status === 'CONFIRMED'
+            ${b.status?.toLowerCase() === 'confirmed'
               ? `<button class="btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>`
               : ''}
           </div>
         `).join('');
       } catch (err) {
-        listEl.innerHTML = `<p style="color:var(--danger);">${err.message}</p>`;
+        listEl.innerHTML = `<p style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
       }
     }
 
@@ -411,13 +442,13 @@
           method: 'DELETE',
           headers: buildHeaders(),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Cancel failed');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
         notify(`Booking ${id} cancelled. Slot is now open again.`, 'success');
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
-        notify(err.message, 'error');
+        notify(err.message || 'Unable to reach booking server. Please check API configuration.', 'error');
       }
     }
 

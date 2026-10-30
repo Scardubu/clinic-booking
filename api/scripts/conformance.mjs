@@ -1,6 +1,24 @@
 // clinic-booking/api/scripts/conformance.mjs
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), 'api/.env'),
+  path.resolve(__dirname, '../.env'),
+];
+for (const p of envPaths) {
+  if (fs.existsSync(p)) {
+    dotenv.config({ path: p });
+  }
+}
 
 const BASE_URL = (process.env.API_BASE_URL || 'http://localhost:4000').replace(/\/$/, '');
 const API_KEY = process.env.API_KEY || 'dev-clinic-api-key-2026';
@@ -26,6 +44,12 @@ async function runConformance() {
   console.log(`\n=== Running Clinic Booking API Conformance Suite (Levels 1–5) ===`);
   console.log(`Target: ${BASE_URL}\n`);
 
+  // 0. RESET: Initialize clean state
+  console.log('-> Testing Level 1: Reset Database State...');
+  const resetRes = await request('/reset', { method: 'POST' });
+  assert.equal(resetRes.status, 200, 'POST /reset must return 200');
+  console.log('   [PASS] POST /reset completed.');
+
   // 1. LEVEL 2: Auth & Payload Validation
   console.log('-> Testing Level 2: API Key Auth & Validation...');
   const noAuth = await request('/slots', { apiKey: false });
@@ -36,8 +60,7 @@ async function runConformance() {
 
   const badPayload = await request('/bookings', {
     method: 'POST',
-    headers: { 'X-Client-Id': `val-client-${Date.now()}` },
-    body: { slotId: 'not-a-uuid', patientName: 'A', patientEmail: 'bad-email' },
+    body: { slot_id: '', name: 'A', email: 'bad-email' },
   });
   assert.equal(badPayload.status, 400, 'Malformed booking payload must return 400');
   console.log('   [PASS] Level 2 verified.');
@@ -47,9 +70,16 @@ async function runConformance() {
   const slotsRes = await request('/slots');
   assert.equal(slotsRes.status, 200, 'GET /slots must return 200');
   const slots = slotsRes.data.slots || [];
-  assert.ok(slots.length >= 3, 'Expected at least 3 available seeded slots');
-  const targetSlot = slots[0];
-  console.log(`   [PASS] Found ${slots.length} available slots. Target slot: ${targetSlot.id}`);
+  const availableSlots = slots.filter(
+    (s) =>
+      s.available !== false &&
+      s.is_available !== false &&
+      new Date(s.start || s.startTime || s.start_time).getTime() > Date.now()
+  );
+  assert.ok(availableSlots.length >= 2, 'Expected at least 2 available seeded slots');
+  const targetSlot = availableSlots[0];
+  const secondSlot = availableSlots[1];
+  console.log(`   [PASS] Found ${availableSlots.length} available future slots. Target slot: ${targetSlot.id}`);
 
   // 3. LEVEL 3: 5-Way Simultaneous Race Condition & Cancellation
   console.log('-> Testing Level 3: 5-Way Concurrent Booking Race & Cancellation...');
@@ -58,14 +88,15 @@ async function runConformance() {
       method: 'POST',
       headers: { 'X-Client-Id': `race-contender-${idx}-${Date.now()}` },
       body: {
-        slotId: targetSlot.id,
-        patientName: `Contender ${idx + 1}`,
-        patientEmail: `contender${idx + 1}.${Date.now()}@example.com`,
+        slot_id: targetSlot.id,
+        name: `Contender ${idx + 1}`,
+        email: `contender${idx + 1}.${Date.now()}@example.com`,
       },
     })
   );
 
   const raceResults = await Promise.all(contenders);
+  console.log('   Race results statuses:', raceResults.map(r => ({ status: r.status, error: r.data.error, msg: r.data.message })));
   const createdCount = raceResults.filter((r) => r.status === 201).length;
   const conflictCount = raceResults.filter((r) => r.status === 409).length;
 
@@ -83,7 +114,7 @@ async function runConformance() {
   // Level 3: Cancel booking and verify slot is freed
   const cancelRes = await request(`/bookings/${bookingId}`, { method: 'DELETE' });
   assert.equal(cancelRes.status, 200, 'DELETE /bookings/:id must return 200');
-  assert.equal(cancelRes.data.status, 'CANCELLED');
+  assert.equal(cancelRes.data.status?.toLowerCase(), 'cancelled');
   console.log('   [PASS] Level 1 & Level 3 verified.');
 
   // 4. LEVEL 4: Idempotency & Cursor Pagination
@@ -96,18 +127,18 @@ async function runConformance() {
     method: 'POST',
     headers: { ...clientHeader, 'Idempotency-Key': idemKey },
     body: {
-      slotId: targetSlot.id,
-      patientName: 'Idempotent User',
-      patientEmail,
+      slot_id: targetSlot.id,
+      name: 'Idempotent User',
+      email: patientEmail,
     },
   });
   const retryAttempt = await request('/bookings', {
     method: 'POST',
     headers: { ...clientHeader, 'Idempotency-Key': idemKey },
     body: {
-      slotId: targetSlot.id,
-      patientName: 'Idempotent User',
-      patientEmail,
+      slot_id: targetSlot.id,
+      name: 'Idempotent User',
+      email: patientEmail,
     },
   });
 
@@ -115,37 +146,38 @@ async function runConformance() {
   assert.equal(retryAttempt.status, 201);
   assert.equal(firstAttempt.data.id, retryAttempt.data.id, 'Retried request must return same booking ID');
 
-  // Mutated payload with same Idempotency-Key must return 409
+  // Mutated payload with same Idempotency-Key must return 422
   const mutatedAttempt = await request('/bookings', {
     method: 'POST',
     headers: { ...clientHeader, 'Idempotency-Key': idemKey },
     body: {
-      slotId: slots[1].id,
-      patientName: 'Mutated Payload User',
-      patientEmail,
+      slot_id: secondSlot.id,
+      name: 'Mutated Payload User',
+      email: patientEmail,
     },
   });
-  assert.equal(mutatedAttempt.status, 409, 'Reusing Idempotency-Key with different body must return 409');
+  assert.equal(mutatedAttempt.status, 422, 'Reusing Idempotency-Key with different body must return 422');
 
   // Create a second booking for the same patient to test pagination
   const secondBooking = await request('/bookings', {
     method: 'POST',
     headers: clientHeader,
     body: {
-      slotId: slots[1].id,
-      patientName: 'Idempotent User',
-      patientEmail,
+      slot_id: secondSlot.id,
+      name: 'Idempotent User',
+      email: patientEmail,
     },
   });
   assert.equal(secondBooking.status, 201);
 
-  const page1 = await request(`/bookings?patientEmail=${encodeURIComponent(patientEmail)}&limit=1`);
+  const page1 = await request(`/bookings?email=${encodeURIComponent(patientEmail)}&limit=1`);
   assert.equal(page1.status, 200);
   assert.equal(page1.data.bookings.length, 1);
-  assert.ok(page1.data.nextCursor, 'Expected nextCursor when more bookings exist');
+  assert.ok(page1.data.next_cursor || page1.data.nextCursor, 'Expected next_cursor when more bookings exist');
+  const nextCursor = page1.data.next_cursor || page1.data.nextCursor;
 
   const page2 = await request(
-    `/bookings?patientEmail=${encodeURIComponent(patientEmail)}&limit=1&cursor=${encodeURIComponent(page1.data.nextCursor)}`
+    `/bookings?email=${encodeURIComponent(patientEmail)}&limit=1&cursor=${encodeURIComponent(nextCursor)}`
   );
   assert.equal(page2.status, 200);
   assert.equal(page2.data.bookings.length, 1);
@@ -157,21 +189,29 @@ async function runConformance() {
   console.log('   [PASS] Level 4 verified.');
 
   // 5. LEVEL 5: Rate Limiting
-  console.log('-> Testing Level 5: Booking Spam Rate Limiter...');
-  const spamClientId = `spammer-${Date.now()}`;
+  console.log('-> Testing Level 5: Booking Spam Rate Limiter (5 attempts per email per minute)...');
+  const spamEmail = `spammer.${Date.now()}@example.com`;
   let hit429 = false;
-  for (let i = 0; i < 15; i++) {
+  let retryAfterHeader = null;
+  for (let i = 0; i < 7; i++) {
     const res = await request('/bookings', {
       method: 'POST',
-      headers: { 'X-Client-Id': spamClientId },
-      body: { slotId: 'invalid-uuid', patientName: 'Spam', patientEmail: 'spam@example.com' },
+      body: { slot_id: 'non-existent', name: 'Spam User', email: spamEmail },
     });
     if (res.status === 429) {
       hit429 = true;
+      retryAfterHeader = res.headers.get('retry-after');
       break;
     }
   }
-  assert.ok(hit429, 'Spamming POST /bookings must trigger 429 Too Many Requests');
+  assert.ok(hit429, 'Spamming POST /bookings for an email must trigger 429 Too Many Requests on 6th attempt');
+  assert.ok(retryAfterHeader, '429 response must include Retry-After header in whole seconds');
+
+  const otherRes = await request('/bookings', {
+    method: 'POST',
+    body: { slot_id: 'non-existent', name: 'Other User', email: `other.${Date.now()}@example.com` },
+  });
+  assert.notEqual(otherRes.status, 429, 'Other emails must not be affected by rate limiting');
   console.log('   [PASS] Level 5 verified.\n');
   console.log('=== ALL 5 LEVELS PASSED CONFORMANCE SUCCESSFULLY ===\n');
 }

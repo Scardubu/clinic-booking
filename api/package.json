@@ -7,7 +7,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "test:conformance": "node scripts/conformance.mjs"
+    "test": "node scripts/conformance.mjs && node scripts/verify_openapi_spec.mjs && node scripts/verify_deep.mjs",
+    "test:conformance": "node scripts/conformance.mjs",
+    "test:spec": "node scripts/verify_openapi_spec.mjs",
+    "test:deep": "node scripts/verify_deep.mjs"
   },
   "dependencies": {
     "@types/cors": "^2.8.17",
@@ -17,10 +20,10 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "typescript": "^5.6.3"
   },
   "devDependencies": {
-    "tsx": "^4.19.1",
-    "typescript": "^5.6.3"
+    "tsx": "^4.19.1"
   }
 }

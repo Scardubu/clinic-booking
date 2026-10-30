@@ -1,51 +1,60 @@
+import crypto from 'node:crypto';
 import { pool, withTransaction } from '../db.js';
-import { ApiError, CreateBookingInput, isValidUuid } from '../validation.js';
+import { ApiError, CreateBookingInput } from '../validation.js';
 import { hashPayload } from '../util/canonical.js';
 import { decodeCursor, encodeCursor } from '../util/cursor.js';
 
 export interface BookingDTO {
   id: string;
-  slotId: string;
   slot_id: string;
-  patientName: string;
+  slotId: string;
+  name: string;
   patient_name: string;
-  patientEmail: string;
+  patientName: string;
+  email: string;
   patient_email: string;
+  patientEmail: string;
   patientPhone: string | null;
   patient_phone: string | null;
   reason: string | null;
-  status: 'CONFIRMED' | 'CANCELLED';
-  createdAt: string;
+  status: 'confirmed' | 'cancelled';
   created_at: string;
-  cancelledAt: string | null;
+  createdAt: string;
   cancelled_at: string | null;
+  cancelledAt: string | null;
   slot?: {
     id: string;
+    provider: string;
     doctorName: string;
     doctor_name: string;
+    start: string;
     startTime: string;
     start_time: string;
+    end: string;
     endTime: string;
     end_time: string;
   };
 }
 
-function mapBookingRow(row: any): BookingDTO {
+export function mapBookingRow(row: any): BookingDTO {
   const createdIso = new Date(row.created_at).toISOString();
   const cancelledIso = row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null;
+  const statusLower = String(row.status || 'confirmed').toLowerCase() as 'confirmed' | 'cancelled';
 
   const dto: BookingDTO = {
-    id: row.id,
-    slotId: row.slot_id,
-    slot_id: row.slot_id,
+    id: String(row.id),
+    slot_id: String(row.slot_id),
+    slotId: String(row.slot_id),
+    name: row.patient_name,
     patientName: row.patient_name,
     patient_name: row.patient_name,
+    email: row.patient_email,
     patientEmail: row.patient_email,
     patient_email: row.patient_email,
     patientPhone: row.patient_phone ?? null,
     patient_phone: row.patient_phone ?? null,
     reason: row.reason ?? null,
-    status: row.status,
+    status: statusLower,
     createdAt: createdIso,
     created_at: createdIso,
     cancelledAt: cancelledIso,
@@ -55,12 +64,16 @@ function mapBookingRow(row: any): BookingDTO {
   if (row.start_time && row.end_time) {
     const startIso = new Date(row.start_time).toISOString();
     const endIso = new Date(row.end_time).toISOString();
+    const provider = row.provider || row.doctor_name || 'Clinic Physician';
     dto.slot = {
-      id: row.slot_id,
-      doctorName: row.doctor_name,
-      doctor_name: row.doctor_name,
+      id: String(row.slot_id),
+      provider,
+      doctorName: provider,
+      doctor_name: provider,
+      start: startIso,
       startTime: startIso,
       start_time: startIso,
+      end: endIso,
       endTime: endIso,
       end_time: endIso,
     };
@@ -103,9 +116,9 @@ export async function createBooking(
         const existing = idemRes.rows[0];
         if (existing.request_hash !== requestHash) {
           throw new ApiError(
-            409,
+            422,
             'IDEMPOTENCY_KEY_CONFLICT',
-            'Idempotency-Key was already used with a different request payload.'
+            'Idempotency-Key reused with a different body'
           );
         }
         if (existing.status === 'COMPLETED' && existing.response_body) {
@@ -129,7 +142,7 @@ export async function createBooking(
     }
 
     const slotRes = await client.query(
-      `SELECT id, doctor_name, start_time, end_time, is_available
+      `SELECT id, COALESCE(provider, doctor_name) AS provider, doctor_name, start_time, end_time, is_available
        FROM slots
        WHERE id = $1
        FOR UPDATE`,
@@ -137,25 +150,34 @@ export async function createBooking(
     );
 
     if (!slotRes.rowCount || !slotRes.rows[0]) {
-      throw new ApiError(404, 'SLOT_NOT_FOUND', 'The requested appointment slot does not exist.');
+      throw new ApiError(404, 'SLOT_NOT_FOUND', "The slot doesn't exist");
     }
 
     const slot = slotRes.rows[0];
+
+    // Level 2: 400 if the slot has already started
+    if (new Date(slot.start_time).getTime() <= Date.now()) {
+      throw new ApiError(400, 'SLOT_ALREADY_STARTED', 'The slot has already started.');
+    }
+
+    // Level 3: 409 if slot already has a confirmed booking
     if (!slot.is_available) {
       throw new ApiError(
         409,
         'SLOT_ALREADY_BOOKED',
-        'This appointment slot has already been booked.'
+        'Slot already booked'
       );
     }
 
+    const newBookingId = crypto.randomUUID();
     let insertedBooking: any;
     try {
       const insertRes = await client.query(
-        `INSERT INTO bookings (slot_id, patient_name, patient_email, patient_phone, reason, status)
-         VALUES ($1, $2, $3, $4, $5, 'CONFIRMED')
+        `INSERT INTO bookings (id, slot_id, patient_name, patient_email, patient_phone, reason, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
          RETURNING *`,
         [
+          newBookingId,
           input.slotId,
           input.patientName,
           input.patientEmail,
@@ -169,7 +191,7 @@ export async function createBooking(
         throw new ApiError(
           409,
           'SLOT_ALREADY_BOOKED',
-          'This appointment slot has already been booked.'
+          'Slot already booked'
         );
       }
       throw err;
@@ -182,14 +204,15 @@ export async function createBooking(
 
     const dto = mapBookingRow({
       ...insertedBooking,
+      provider: slot.provider,
       doctor_name: slot.doctor_name,
       start_time: slot.start_time,
       end_time: slot.end_time,
     });
 
     const responseBody = {
-      booking: dto,
       ...dto,
+      booking: dto,
     };
 
     if (cleanIdemKey) {
@@ -213,55 +236,57 @@ export async function createBooking(
 }
 
 export async function getBookingById(bookingId: string): Promise<BookingDTO> {
-  if (!isValidUuid(bookingId)) {
-    throw new ApiError(400, 'INVALID_BOOKING_ID', 'Booking ID must be a valid UUID.');
+  const cleanId = String(bookingId || '').trim();
+  if (!cleanId) {
+    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'No booking with that id');
   }
 
   const { rows, rowCount } = await pool.query(
-    `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+    `SELECT b.*, COALESCE(s.provider, s.doctor_name) AS provider, s.doctor_name, s.start_time, s.end_time
      FROM bookings b
      JOIN slots s ON s.id = b.slot_id
      WHERE b.id = $1`,
-    [bookingId]
+    [cleanId]
   );
 
   if (!rowCount || !rows[0]) {
-    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'No booking with that id');
   }
 
   return mapBookingRow(rows[0]);
 }
 
 export async function cancelBooking(bookingId: string): Promise<BookingDTO> {
-  if (!isValidUuid(bookingId)) {
-    throw new ApiError(400, 'INVALID_BOOKING_ID', 'Booking ID must be a valid UUID.');
+  const cleanId = String(bookingId || '').trim();
+  if (!cleanId) {
+    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'No booking with that id');
   }
 
   return withTransaction(async (client) => {
     const existingRes = await client.query(
-      `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+      `SELECT b.*, COALESCE(s.provider, s.doctor_name) AS provider, s.doctor_name, s.start_time, s.end_time
        FROM bookings b
        JOIN slots s ON s.id = b.slot_id
        WHERE b.id = $1
        FOR UPDATE OF b, s`,
-      [bookingId]
+      [cleanId]
     );
 
     if (!existingRes.rowCount || !existingRes.rows[0]) {
-      throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+      throw new ApiError(404, 'BOOKING_NOT_FOUND', 'No booking with that id');
     }
 
     const booking = existingRes.rows[0];
-    if (booking.status === 'CANCELLED') {
-      throw new ApiError(409, 'BOOKING_ALREADY_CANCELLED', 'Booking is already cancelled.');
+    if (String(booking.status).toLowerCase() === 'cancelled') {
+      throw new ApiError(409, 'BOOKING_ALREADY_CANCELLED', 'Already cancelled');
     }
 
     const updatedRes = await client.query(
       `UPDATE bookings
-       SET status = 'CANCELLED', cancelled_at = NOW()
+       SET status = 'cancelled', cancelled_at = NOW()
        WHERE id = $1
        RETURNING *`,
-      [bookingId]
+      [cleanId]
     );
 
     await client.query(
@@ -273,6 +298,7 @@ export async function cancelBooking(bookingId: string): Promise<BookingDTO> {
 
     return mapBookingRow({
       ...updatedRes.rows[0],
+      provider: booking.provider,
       doctor_name: booking.doctor_name,
       start_time: booking.start_time,
       end_time: booking.end_time,
@@ -283,14 +309,21 @@ export async function cancelBooking(bookingId: string): Promise<BookingDTO> {
 export interface ListBookingsQuery {
   patientEmail?: string;
   status?: string;
-  limit?: number;
-  page?: number;
-  offset?: number;
+  limit?: number | string;
+  page?: number | string;
+  offset?: number | string;
   cursor?: string;
 }
 
 export async function listBookingsPaginated(params: ListBookingsQuery) {
-  const limit = Math.min(50, Math.max(1, Number(params.limit) || 10));
+  if (params.limit !== undefined) {
+    const num = Number(params.limit);
+    if (!Number.isInteger(num) || num < 1 || num > 50) {
+      throw new ApiError(400, 'INVALID_LIMIT', 'Invalid limit');
+    }
+  }
+
+  const limit = params.limit !== undefined ? Number(params.limit) : 10;
   const values: any[] = [];
   const filters: string[] = [];
 
@@ -300,8 +333,8 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
   }
 
   if (params.status && ['CONFIRMED', 'CANCELLED'].includes(params.status.toUpperCase())) {
-    values.push(params.status.toUpperCase());
-    filters.push(`b.status = $${values.length}`);
+    values.push(params.status.toLowerCase());
+    filters.push(`LOWER(b.status) = $${values.length}`);
   }
 
   const baseWhere = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
@@ -318,7 +351,7 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
     }
     values.push(decoded.createdAt, decoded.id);
     filters.push(
-      `(b.created_at, b.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`
+      `((date_trunc('milliseconds', b.created_at), b.id) > (date_trunc('milliseconds', $${values.length - 1}::timestamptz), $${values.length}::text))`
     );
   }
 
@@ -336,12 +369,13 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
   values.push(limit + 1);
   const limitIdx = values.length;
 
+  // OpenAPI spec: "That person's bookings, oldest first."
   const { rows } = await pool.query(
-    `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+    `SELECT b.*, COALESCE(s.provider, s.doctor_name) AS provider, s.doctor_name, s.start_time, s.end_time
      FROM bookings b
      JOIN slots s ON s.id = b.slot_id
      ${whereClause}
-     ORDER BY b.created_at DESC, b.id DESC
+     ORDER BY b.created_at ASC, b.id ASC
      LIMIT $${limitIdx}
      ${offsetSql}`,
     values
@@ -356,6 +390,8 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
 
   return {
     bookings,
+    next_cursor: nextCursor,
+    nextCursor,
     data: bookings,
     items: bookings,
     pagination: {
@@ -373,7 +409,5 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
     page,
     hasMore,
     has_more: hasMore,
-    nextCursor,
-    next_cursor: nextCursor,
   };
 }
