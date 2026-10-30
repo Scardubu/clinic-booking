@@ -1,4 +1,5 @@
-Clinic Booking Platform
+## Clinic Booking Platform
+
 A high-concurrency clinic booking system featuring a TypeScript/Express API and a lightweight secure web client. Engineered for strict adherence to OpenAPI 3.0.3 specifications, this platform implements database-level concurrency control, payload-aware idempotency, and intelligent rate limiting to guarantee data integrity under heavy load.
 Live Environments
 | Environment | URL |
