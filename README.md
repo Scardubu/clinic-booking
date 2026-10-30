@@ -1,7 +1,7 @@
 # 🏥 Koya Clinic — Patient Appointment Booking Platform
 
-[![Status](https://img.shields.io/badge/status-live-brightgreen.svg)](https://clinic-booking-web-mu.vercel.app)
-[![API Health](https://img.shields.io/badge/API-healthy-emerald.svg)](https://clinic-booking-api-od9i.onrender.com/health)
+[![Patient Portal](https://img.shields.io/badge/Web%20Portal-Live-brightgreen.svg?logo=vercel)](https://clinic-booking-web-mu.vercel.app)
+[![API Health](https://img.shields.io/badge/API%20Health-Healthy-emerald.svg)](https://clinic-booking-api-od9i.onrender.com/health)
 [![Node.js](https://img.shields.io/badge/Node.js-v22+-339933.svg?logo=nodedotjs)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-blue.svg?logo=typescript)](https://www.typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg?logo=postgresql)](https://www.postgresql.org)
@@ -13,14 +13,14 @@ A high-concurrency, patient-first clinic booking system featuring an intuitive w
 
 ## 🌐 Live Environments
 
-| Service | Environment URL | Description |
-| :--- | :--- | :--- |
-| **Patient Web Portal** | [clinic-booking-web-mu.vercel.app](https://clinic-booking-web-mu.vercel.app) | Responsive patient interface hosted on Vercel Edge |
-| **API Base URL** | [clinic-booking-api-od9i.onrender.com](https://clinic-booking-api-od9i.onrender.com) | Production REST API hosted on Render |
-| **System Health** | [clinic-booking-api-od9i.onrender.com/health](https://clinic-booking-api-od9i.onrender.com/health) | Real-time health check & service uptime monitor |
+| Service | Environment URL | Description | Status |
+| :--- | :--- | :--- | :--- |
+| **Patient Web Portal** | [clinic-booking-web-mu.vercel.app](https://clinic-booking-web-mu.vercel.app) | Responsive patient interface hosted on Vercel Edge | ![Live](https://img.shields.io/badge/status-active-brightgreen) |
+| **Production API** | [clinic-booking-api-od9i.onrender.com](https://clinic-booking-api-od9i.onrender.com) | Production REST API backend hosted on Render | ![Live](https://img.shields.io/badge/status-active-brightgreen) |
+| **Health Monitor** | [clinic-booking-api-od9i.onrender.com/health](https://clinic-booking-api-od9i.onrender.com/health) | Real-time health check & service uptime monitor | ![Healthy](https://img.shields.io/badge/uptime-100%25-emerald) |
 
-> ℹ️ **Infrastructure Note (Cold Starts):**  
-> The backend API is hosted on Render's free tier. Idle instances scale down after 15 minutes of inactivity. When awakening from an idle state, the initial request may take ~50 seconds to spin up. All subsequent requests respond with sub-second latency.
+> ℹ️ **Infrastructure Advisory (Render Cold Starts):**  
+> The backend API is hosted on Render's free tier. Idle instances scale down after 15 minutes of inactivity. When awakening from an idle state, the initial request may take ~50 seconds to spin up. All subsequent requests respond with sub-second latency. The web portal features built-in loading states to guide users during cold starts.
 
 ---
 
@@ -28,24 +28,26 @@ A high-concurrency, patient-first clinic booking system featuring an intuitive w
 
 ### 1. 📅 Real-Time Slot Discovery
 - **Live Clinic Availability:** Browse upcoming appointment slots dynamically populated from clinic schedules.
-- **Provider Transparency:** See doctor names and specialties (e.g., *Dr. Adaobi Okafor — General Practice*, *Dr. Tunde Bakare — Internal Medicine*, *Dr. Amina Yusuf — Family Medicine*) upfront.
-- **Dynamic Slot States:** Distinct visual indicators for available slots vs. booked slots prevent selecting unavailable times.
+- **Doctor Transparency:** Review physician names and clinical specializations (e.g., *Dr. Adaobi Okafor — General Practice*, *Dr. Tunde Bakare — Internal Medicine*, *Dr. Amina Yusuf — Family Medicine*) upfront.
+- **Dynamic Slot States:** Distinct visual indicators for available slots vs. booked slots prevent accidental selection of unavailable times.
+- **Provider Filtering:** Search for specific healthcare providers or specializations via API query parameters or web filters.
 
 ### 2. 📝 Frictionless Booking Workflow
-- **Human-Readable Slot Cards:** Eliminates technical jargon and raw UUIDs in favor of clean doctor and appointment time summaries.
-- **Interactive Slot Switching:** Effortlessly switch between appointment slots with keyboard navigation and instant focus without layout shifts.
-- **Guided Form Validation:** Real-time feedback for required fields (patient name, valid email, phone number, and visit reason).
+- **Human-Readable Slot Cards:** Eliminates technical jargon and raw UUIDs in favor of clean physician and appointment time summaries.
+- **Interactive Slot Selection:** Effortlessly switch between appointment slots with keyboard navigation (`Enter` / `Space`) and instant focus without layout shifts.
+- **Guided Form Validation:** Real-time feedback for required fields (patient full name, valid email, phone number, and visit reason).
+- **Change Slot Shortcut:** Need to pick a different time? Click `⇄ Change Slot` to instantly return to the calendar selection without losing your entered patient details.
 
 ### 3. 🧾 Consolidated Digital Receipt
-- **Instant Booking Confirmation:** A single, high-contrast receipt card appears immediately upon reservation with doctor details, appointment time, and patient information.
-- **1-Click Reference ID Copy:** The unique Booking Reference ID is automatically copied to the patient's clipboard upon confirmation, with an interactive copy button for convenience.
-- **Quick Actions:** Seamlessly jump to "View in My Bookings" or choose "Book Another Appointment" to reset the form cleanly.
+- **Instant Booking Confirmation:** A single, high-contrast receipt card appears immediately upon reservation with physician details, appointment time, and patient information.
+- **1-Click Reference ID Auto-Copy:** The unique Booking Reference ID is automatically copied to your clipboard upon confirmation, with an interactive copy button for convenience.
+- **Quick Navigation:** Seamlessly jump to `View in My Bookings` to see your record in the patient history or click `Book Another Appointment` to reset the form cleanly.
 
 ### 4. 👥 Appointment Management & Self-Service
-- **Email History Search:** Search and filter appointments by patient email address with friendly empty-state guidance and quick-clear filters.
+- **Email History Search:** Search and filter appointments by patient email address with friendly empty-state guidance and 1-click filter clearing.
 - **Smooth Cursor Pagination:** Browse booking records chronologically with high-performance keyset cursor pagination (`First Page` / `Next Page`).
 - **Instant Cancellation & Slot Recovery:** Cancel an appointment with a single click; the slot is instantly freed and returned to the pool of available appointments.
-- **Reference ID Lookup:** Look up any existing appointment by Booking Reference ID to check status or cancel anytime.
+- **Reference ID Lookup:** Look up any existing appointment by Booking Reference ID to check status, verify appointment details, or cancel anytime.
 
 ---
 
@@ -61,8 +63,8 @@ A high-concurrency, patient-first clinic booking system featuring an intuitive w
                                 ▼
    ┌─────────────────────────────────────────────────────────┐
    │             Vercel Edge Serverless Proxy                │
-   │  • Secure API Key injection  • Endpoint allowlisting     │
-   │  • Header forwarding         • Edge attack isolation    │
+   │  • Secure API Key injection  • Edge attack isolation    │
+   │  • Administrative blocking  • Header forwarding         │
    └────────────────────────────┬────────────────────────────┘
                                 │ Authenticated Requests
                                 ▼
@@ -84,10 +86,10 @@ A high-concurrency, patient-first clinic booking system featuring an intuitive w
 
 | Protection | Consumer Benefit | Engineering Mechanism |
 | :--- | :--- | :--- |
-| **Zero Double-Bookings** | Prevents two patients from ever reserving the same time slot, even under concurrent traffic spikes. | Engine-level PostgreSQL partial unique index: `CREATE UNIQUE INDEX idx_bookings_unique_confirmed_slot ON bookings (slot_id) WHERE LOWER(status) = 'confirmed'`. Concurrent collisions yield `409 Conflict` instantly. |
-| **Idempotent Replays** | Network drops or double-clicking the book button will never double-charge or create duplicate appointments. | SHA-256 canonical payload hashing with PostgreSQL transaction advisory locks (`pg_advisory_xact_lock`). Replayed requests return cached confirmations without consuming rate-limit budgets. |
+| **Zero Double-Bookings** | Prevents two patients from ever reserving the same appointment slot, even under concurrent traffic spikes. | Engine-level PostgreSQL partial unique index: `CREATE UNIQUE INDEX idx_bookings_unique_confirmed_slot ON bookings (slot_id) WHERE LOWER(status) = 'confirmed'`. Concurrent collisions yield `409 Conflict` instantly. |
+| **Idempotent Replays** | Network drops or double-clicking the book button will never double-charge or create duplicate appointments. | SHA-256 canonical payload hashing with PostgreSQL transaction advisory locks (`pg_advisory_xact_lock`). Replayed requests return cached confirmations with `Idempotent-Replayed: true` without consuming rate-limit budgets. |
 | **Spam & Bot Guardrails** | Protects appointment availability against scrapers and booking bots. | Sliding-window rate limiter allowing 5 attempts per email per minute with an exact `Retry-After` header on HTTP 429. |
-| **Edge Privacy Shield** | Patient credentials, administrative API keys, and database tokens remain 100% confidential. | Vercel Edge Serverless proxy injects `X-API-Key` server-side, blocking administrative endpoints (`POST /reset`) from client access. |
+| **Edge Privacy Shield** | Patient credentials, administrative API keys, and database tokens remain 100% confidential. | Vercel Edge Serverless proxy injects `X-API-Key` server-side while blocking administrative endpoints (`POST /reset`) from client access with `403 Forbidden`. |
 
 ---
 
@@ -105,16 +107,24 @@ All API requests require authentication via the `X-API-Key` header (or `Authoriz
 | `GET` | `/bookings` | List patient bookings (supports email filter & cursor pagination) | Allowed |
 | `GET` | `/bookings/:id` | Look up a single booking by its Reference ID | Allowed |
 | `DELETE` | `/bookings/:id` | Cancel an appointment and immediately free its slot | Allowed |
-| `GET` | `/health` | Check service health and uptime status | Allowed |
+| `POST` | `/bookings/:id/cancel` | Alias to cancel an appointment (POST alternative) | Allowed |
+| `GET` | `/health` | Check service health and uptime status (No API key needed) | Public |
 | `POST` | `/reset` | Purge database and re-seed default demo slots (Admin only) | Edge-Blocked |
 
 ---
 
-### Key Endpoint Examples
+### Detailed Endpoint Examples
 
 #### 1. Retrieve Available Appointment Slots
+Filter appointment slots by availability or provider name.
+
 ```bash
+# Get only open/available slots
 curl -X GET "https://clinic-booking-api-od9i.onrender.com/slots?available=true" \
+  -H "X-API-Key: your_api_key_here"
+
+# Or filter by doctor name / specialty
+curl -X GET "https://clinic-booking-api-od9i.onrender.com/slots?available=true&provider=Adaobi" \
   -H "X-API-Key: your_api_key_here"
 ```
 
@@ -135,7 +145,25 @@ curl -X GET "https://clinic-booking-api-od9i.onrender.com/slots?available=true" 
 }
 ```
 
-#### 2. Create an Appointment Booking
+#### 2. Retrieve Specific Slot Details
+```bash
+curl -X GET "https://clinic-booking-api-od9i.onrender.com/slots/0a954bbf-63e1-4058-b747-52af500b6d30" \
+  -H "X-API-Key: your_api_key_here"
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "0a954bbf-63e1-4058-b747-52af500b6d30",
+  "provider": "Dr. Adaobi Okafor (General Practice)",
+  "doctor_name": "Dr. Adaobi Okafor (General Practice)",
+  "start_time": "2026-11-01T09:00:00.000Z",
+  "end_time": "2026-11-01T09:30:00.000Z",
+  "is_available": true
+}
+```
+
+#### 3. Create an Appointment Booking
 Include a unique `Idempotency-Key` header to protect against accidental retries or network interruptions.
 
 ```bash
@@ -172,23 +200,77 @@ curl -X POST "https://clinic-booking-api-od9i.onrender.com/bookings" \
 }
 ```
 
-#### 3. Keyset Cursor-Based Pagination
+#### 4. List Patient Bookings & Keyset Cursor Pagination
+Query bookings filtered by patient email, booking status (`confirmed` / `cancelled`), and navigate pages using keyset cursor pagination.
+
 ```bash
+# Fetch first page with limit=10
 curl -X GET "https://clinic-booking-api-od9i.onrender.com/bookings?email=adaeze@example.com&limit=10" \
+  -H "X-API-Key: your_api_key_here"
+
+# Fetch subsequent page using next_cursor
+curl -X GET "https://clinic-booking-api-od9i.onrender.com/bookings?email=adaeze@example.com&limit=10&cursor=eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0zMFQwODozMDowMC4wMDBaIiwiaWQiOiJiM2UyMWE0Zi..." \
   -H "X-API-Key: your_api_key_here"
 ```
 
 **Response (200 OK):**
 ```json
 {
-  "items": [ ... ],
-  "next_cursor": "eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0zMFQwODozMDowMC4wMDBaIiwiaWQiOiJiM2UyMWE0Zi..."
+  "bookings": [
+    {
+      "id": "b3e21a4f-5678-4901-abcd-ef0123456789",
+      "slot_id": "0a954bbf-63e1-4058-b747-52af500b6d30",
+      "name": "Adaeze Nwosu",
+      "email": "adaeze@example.com",
+      "phone": "+234 803 123 4567",
+      "reason": "Annual Wellness Checkup",
+      "status": "confirmed",
+      "created_at": "2026-10-30T08:30:00.000Z"
+    }
+  ],
+  "next_cursor": "eyJjcmVhdGVkX2F0IjoiMjAyNi0xMC0zMFQwODozMDowMC4wMDBaIiwiaWQiOiJiM2UyMWE0Zi...",
+  "total": 1,
+  "limit": 10,
+  "has_more": false
 }
 ```
 
-#### 4. Cancel an Appointment
+#### 5. Retrieve Specific Booking by Reference ID
+```bash
+curl -X GET "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5678-4901-abcd-ef0123456789" \
+  -H "X-API-Key: your_api_key_here"
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "b3e21a4f-5678-4901-abcd-ef0123456789",
+  "slot_id": "0a954bbf-63e1-4058-b747-52af500b6d30",
+  "name": "Adaeze Nwosu",
+  "email": "adaeze@example.com",
+  "phone": "+234 803 123 4567",
+  "reason": "Annual Wellness Checkup",
+  "status": "confirmed",
+  "created_at": "2026-10-30T08:30:00.000Z",
+  "cancelled_at": null,
+  "slot": {
+    "id": "0a954bbf-63e1-4058-b747-52af500b6d30",
+    "provider": "Dr. Adaobi Okafor (General Practice)",
+    "start_time": "2026-11-01T09:00:00.000Z",
+    "end_time": "2026-11-01T09:30:00.000Z"
+  }
+}
+```
+
+#### 6. Cancel an Appointment
+Cancelling an appointment automatically updates the status to `cancelled` and immediately releases the slot back to the clinic pool.
+
 ```bash
 curl -X DELETE "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5678-4901-abcd-ef0123456789" \
+  -H "X-API-Key: your_api_key_here"
+
+# Alternatively, via POST cancel endpoint:
+curl -X POST "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5678-4901-abcd-ef0123456789/cancel" \
   -H "X-API-Key: your_api_key_here"
 ```
 
@@ -201,6 +283,22 @@ curl -X DELETE "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5
 }
 ```
 
+#### 7. System Health Check
+Public endpoint to verify service uptime and operational status.
+
+```bash
+curl -X GET "https://clinic-booking-api-od9i.onrender.com/health"
+```
+
+**Response (200 OK):**
+```json
+{
+  "status": "ok",
+  "service": "clinic-booking-api",
+  "timestamp": "2026-10-30T08:30:00.000Z"
+}
+```
+
 ---
 
 ### HTTP Status Codes & Error Formats
@@ -209,13 +307,14 @@ curl -X DELETE "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5
 | :--- | :--- | :--- |
 | `200 OK` | Success | Request succeeded and returned requested data. |
 | `201 Created` | Booking Confirmed | New booking created (or replayed via identical idempotency key). |
-| `400 Bad Request` | Validation Error | Missing fields, invalid email format, or past appointment slot. |
+| `400 Bad Request` | Validation Error | Missing fields, invalid email format, invalid phone, or past appointment slot. |
 | `401 Unauthorized` | Authentication Failed | Missing or invalid `X-API-Key`. |
+| `403 Forbidden` | Access Denied | Administrative endpoint (e.g. `/reset`) invoked through the public edge proxy. |
 | `404 Not Found` | Resource Missing | Booking Reference ID or Slot ID does not exist. |
 | `409 Conflict` | Slot Already Booked | Target slot was reserved by another patient or already cancelled. |
 | `422 Unprocessable` | Idempotency Key Conflict | Same `Idempotency-Key` re-sent with a modified request payload. |
-| `429 Too Many Requests`| Rate Limit Exceeded | Email exceeded 5 attempts/min limit. Header includes `Retry-After`. |
-| `502 Bad Gateway` | Proxy Error | Upstream API backend unreachable during wake-up cycle. |
+| `429 Too Many Requests`| Rate Limit Exceeded | Email exceeded 5 attempts/min limit. Header includes exact `Retry-After` seconds. |
+| `502 Bad Gateway` | Proxy Error | Upstream API backend unreachable during Render wake-up cycle. |
 
 ---
 
@@ -229,15 +328,16 @@ curl -X DELETE "https://clinic-booking-api-od9i.onrender.com/bookings/b3e21a4f-5
 ### 1. Clone & Configure Backend
 ```bash
 git clone https://github.com/Scardubu/clinic-booking.git
-cd clinic-booking/api
+cd clinic-booking
 
 # Copy environment template
-cp .env.example .env
+cp api/.env.example api/.env
 ```
 
 Edit `api/.env`:
 ```env
 PORT=4000
+NODE_ENV=development
 DATABASE_URL=postgresql://user:password@localhost:5432/clinic_booking
 API_KEY=koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c
 CORS_ORIGIN=*
@@ -246,14 +346,16 @@ RATE_LIMIT_WINDOW_MS=60000
 ```
 
 ### 2. Install & Start Backend
+You can run commands directly from the root repository or inside `api/`:
+
 ```bash
 # Install dependencies
-npm ci --include=dev
+npm ci --include=dev --prefix api
 
 # Build TypeScript to JavaScript
 npm run build
 
-# Start production server (auto-runs database migrations and seeds demo slots)
+# Start production server (auto-runs migrations and seeds demo clinic slots)
 npm start
 
 # OR start in development mode with live reload
@@ -263,7 +365,7 @@ npm run dev
 ### 3. Run the Frontend Client
 You can serve the static frontend with any local HTTP server:
 ```bash
-cd ../web
+cd web
 npx serve .
 # Visit http://localhost:3000 in your browser
 ```
@@ -272,25 +374,24 @@ npx serve .
 
 ## 🧪 Comprehensive Verification & Test Suite
 
-The platform includes four verification suites covering end-to-end functionality, concurrency guarantees, and UX accessibility.
+The platform includes four verification suites covering end-to-end functionality, concurrency guarantees, and UX accessibility:
 
 ```bash
-cd api
+# Run all test suites sequentially from the root
+npm test
 
+# OR run individual suites:
 # 1. Conformance Suite (Levels 1–5: Concurrency races, idempotency replays, pagination, rate limiting)
 npm run test:conformance
 
 # 2. Strict OpenAPI 3.0.3 Specification Contract Testing
 npm run test:spec
 
-# 3. Deep Skeptical Verification (Proxy routing, query param preservation, hash determinism)
+# 3. Deep Skeptical Verification (Proxy routing, query param preservation, hash determinism, edge security)
 npm run test:deep
 
 # 4. Frontend UX Verification (17 comprehensive UI/UX, accessibility, and receipt tests)
 npm run test:frontend
-
-# Run all test suites sequentially
-npm test
 ```
 
 > ⚠️ **Warning:** Test suites execute `POST /reset` to create clean testing baselines. Never point automated test scripts at a production database.
@@ -310,7 +411,7 @@ npm test
 2. Configure settings:
    - **Root Directory:** `api`
    - **Build Command:** `npm ci --include=dev && npm run build`
-   - **Start Command:** `node dist/server.js`
+   - **Start Command:** `npm start`
    - **Health Check Path:** `/health`
 3. Configure Environment Variables:
    - `DATABASE_URL`: Your pooled Neon connection string.
@@ -324,7 +425,7 @@ npm test
    - **Root Directory:** `web`
    - **Framework Preset:** `Other` (static)
 3. Configure Environment Variables:
-   - `API_BASE_URL`: Render service URL (e.g., `https://clinic-booking-api-od9i.onrender.com`).
+   - `BACKEND_URL`: Render service URL (e.g., `https://clinic-booking-api-od9i.onrender.com`).
    - `API_KEY`: Must match the secret `API_KEY` configured in the Render backend.
 
 ---
@@ -334,8 +435,11 @@ npm test
 ```
 clinic-booking/
 ├── README.md                     # Consumer & developer documentation
+├── LICENSE                       # MIT License
+├── package.json                  # Root monorepo proxy scripts
 ├── render.yaml                   # Infrastructure-as-code for Render deployment
 ├── api/                          # Express API & PostgreSQL backend
+│   ├── .env.example              # Environment variables template
 │   ├── sql/
 │   │   └── schema.sql            # Idempotent DB schema & demo slot seed script
 │   ├── src/
@@ -357,7 +461,7 @@ clinic-booking/
 │   ├── scripts/
 │   │   ├── conformance.mjs       # Concurrency & core level conformance test suite
 │   │   ├── verify_openapi_spec.mjs # Strict OpenAPI 3.0.3 contract adherence tests
-│   │   ├── verify_deep.mjs       # Proxy, cryptography & header integrity tests
+│   │   ├── verify_deep.mjs       # Proxy, cryptography, header integrity & reset block tests
 │   │   └── verify_frontend_ux.mjs# 17 DOM & user journey verification tests
 │   ├── package.json              # API dependencies & test scripts
 │   └── tsconfig.json             # TypeScript compiler configuration
@@ -367,7 +471,7 @@ clinic-booking/
     ├── favicon.ico               # Clinic portal favicon
     ├── favicon.svg               # Vector clinic branding icon
     └── api/
-        └── [...path].js          # Edge serverless proxy with API key encapsulation
+        └── [...path].js          # Edge serverless proxy with API key encapsulation & /reset block
 ```
 
 ---

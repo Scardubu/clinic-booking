@@ -172,6 +172,15 @@ async function runDeepVerification() {
     process.env.BACKEND_URL = originalBackend;
   }
 
+  // Test 10: Proxy security blocks administrative /reset endpoint
+  console.log('10. Testing proxy blocks administrative endpoint POST /api/reset (returns 403):');
+  const resetRes = mockResponse();
+  await proxyHandler({ url: '/api/reset', headers: {}, method: 'POST' }, resetRes);
+  const resetResult = resetRes.getResult();
+  assert.equal(resetResult.status, 403, `Expected proxy to block /reset with 403, got ${resetResult.status}`);
+  assert.equal(resetResult.body.error, 'Forbidden');
+  console.log('   [PASS] Proxy successfully blocks administrative /reset with 403 Forbidden.');
+
   console.log('\n=== ALL DEEP VERIFICATION CHECKS PASSED ===\n');
 }
 

@@ -44,6 +44,15 @@ export default async function handler(req, res) {
     pathname = `/${pathname}`;
   }
 
+  // Security Guardrail: Block administrative endpoints from being invoked via public edge proxy
+  const cleanPath = pathname.replace(/\/+$/, '').toLowerCase();
+  if (cleanPath === '/reset' || cleanPath.endsWith('/reset')) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Administrative endpoints cannot be accessed via the public edge proxy.',
+    });
+  }
+
   const searchParams = new URLSearchParams(parsedUrl.search);
   searchParams.delete('path'); // Remove Vercel catch-all parameter if injected
 

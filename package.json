@@ -1,0 +1,17 @@
+{
+  "name": "clinic-booking",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Patient Appointment Booking Platform",
+  "scripts": {
+    "dev": "npm --prefix api run dev",
+    "build": "npm --prefix api run build",
+    "start": "npm --prefix api start",
+    "test": "npm --prefix api test",
+    "test:conformance": "npm --prefix api run test:conformance",
+    "test:spec": "npm --prefix api run test:spec",
+    "test:deep": "npm --prefix api run test:deep",
+    "test:frontend": "npm --prefix api run test:frontend"
+  }
+}
