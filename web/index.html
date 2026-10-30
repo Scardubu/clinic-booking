@@ -10,222 +10,811 @@
     :root {
       --bg: #08090c;
       --surface: #0e1017;
+      --surface-raised: #141824;
       --border: #222634;
+      --border-hover: #33394d;
       --text: #f3f4f6;
-      --muted: #9ca3af;
+      --text-secondary: #9ca3af;
+      --muted: #6b7280;
       --cyan: #00d9ff;
+      --cyan-glow: rgba(0, 217, 255, 0.4);
+      --cyan-tint: rgba(0, 217, 255, 0.1);
       --emerald: #00ff66;
+      --emerald-glow: rgba(0, 255, 102, 0.4);
+      --emerald-tint: rgba(0, 255, 102, 0.1);
       --danger: #ff4d6d;
+      --danger-tint: rgba(255, 77, 109, 0.14);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
-      line-height: 1.5;
-      padding: 2rem 1rem;
+      line-height: 1.55;
+      padding: 2.25rem 1.25rem 4rem;
+      min-height: 100vh;
     }
-    .container { max-width: 1040px; margin: 0 auto; }
+
+    .container {
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* Header */
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 1rem;
-      padding-bottom: 1.25rem;
-      margin-bottom: 1.5rem;
+      gap: 1.25rem;
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
       border-bottom: 1px solid var(--border);
     }
-    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+    .header-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .header-icon {
+      font-size: 2rem;
+      line-height: 1;
+    }
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-top: 0.2rem;
+    }
     .pill {
-      font-size: 0.78rem;
-      padding: 0.3rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.35rem 0.85rem;
       border-radius: 999px;
-      background: rgba(0, 217, 255, 0.1);
+      background: var(--cyan-tint);
       color: var(--cyan);
       border: 1px solid rgba(0, 217, 255, 0.35);
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      letter-spacing: 0.02em;
     }
+
+    /* Layout & Cards */
     .layout {
       display: grid;
       grid-template-columns: 1.25fr 1fr;
-      gap: 1.5rem;
+      gap: 2rem;
+      align-items: start;
     }
-    @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+    @media (max-width: 860px) {
+      .layout {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+    }
+
     .card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s ease;
     }
-    h2 { font-size: 1.05rem; color: var(--cyan); margin-bottom: 0.9rem; }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    h2 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: var(--cyan);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Notification Banner */
+    .banner {
+      display: none;
+      padding: 0.95rem 1.25rem;
+      border-radius: var(--radius-md);
+      margin-bottom: 1.75rem;
+      font-size: 0.92rem;
+      line-height: 1.5;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .banner.success {
+      display: block;
+      background: var(--emerald-tint);
+      border: 1px solid rgba(0, 255, 102, 0.45);
+      color: var(--emerald);
+      box-shadow: 0 0 16px rgba(0, 255, 102, 0.15);
+    }
+    .banner.error {
+      display: block;
+      background: var(--danger-tint);
+      border: 1px solid rgba(255, 77, 109, 0.45);
+      color: var(--danger);
+      box-shadow: 0 0 16px rgba(255, 77, 109, 0.15);
+    }
+
+    /* Slots Grid */
     .slots-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-      gap: 0.75rem;
-      max-height: 400px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.85rem;
+      max-height: 440px;
       overflow-y: auto;
-      padding-right: 0.25rem;
+      padding-right: 0.4rem;
     }
+    .slots-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .slots-grid::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 4px;
+    }
+    .slots-grid::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 4px;
+    }
+    .slots-grid::-webkit-scrollbar-thumb:hover {
+      background: var(--muted);
+    }
+
+    /* Slot Card & Active Glowing State */
     .slot-card {
-      background: #08090c;
+      position: relative;
+      background: #090b10;
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.8rem;
+      border-radius: var(--radius-md);
+      padding: 0.95rem;
       cursor: pointer;
-      transition: border-color 0.15s ease, transform 0.1s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
     }
-    .slot-card:hover { border-color: var(--cyan); }
+    .slot-card:hover {
+      border-color: rgba(0, 217, 255, 0.45);
+      background: #0e121a;
+      transform: translateY(-2px);
+    }
+    .slot-card:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
     .slot-card.selected {
-      border-color: var(--emerald);
-      background: rgba(0, 255, 102, 0.08);
+      border-color: var(--cyan);
+      background: linear-gradient(135deg, rgba(0, 217, 255, 0.14) 0%, rgba(14, 16, 23, 0.95) 100%);
+      box-shadow: 0 0 0 1px var(--cyan), 0 0 18px var(--cyan-glow), inset 0 0 12px rgba(0, 217, 255, 0.12);
+      transform: translateY(-2px);
     }
-    .slot-time { font-weight: 600; font-size: 0.92rem; }
-    .slot-doctor { font-size: 0.8rem; color: var(--muted); margin-top: 0.2rem; }
-    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; }
+
+    .slot-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .slot-time {
+      font-weight: 700;
+      font-size: 0.92rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .slot-badge-selected {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2rem 0.55rem;
+      border-radius: 999px;
+      background: var(--cyan);
+      color: #050608;
+      box-shadow: 0 0 10px rgba(0, 217, 255, 0.55);
+      animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.7); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .slot-doctor-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .slot-doctor-name {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .slot-doctor-spec {
+      font-size: 0.74rem;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      width: fit-content;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .slot-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0.2rem;
+      padding-top: 0.45rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Monospace & UUID Styling */
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: -0.01em;
+    }
+    .uuid-badge {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.76rem;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.18rem 0.45rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      user-select: all;
+      word-break: break-all;
+    }
+    .uuid-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    /* Copy Button */
+    .copy-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.3rem;
+      width: auto;
+      padding: 0.22rem 0.55rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.74rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .copy-btn:hover {
+      color: var(--cyan);
+      border-color: rgba(0, 217, 255, 0.4);
+      background: var(--cyan-tint);
+    }
+    .copy-btn.copied {
+      color: #050608 !important;
+      background: var(--emerald) !important;
+      border-color: var(--emerald) !important;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.45);
+      animation: popIn 0.15s ease-out;
+    }
+    .copy-btn-prominent {
+      padding: 0.4rem 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: var(--cyan-tint);
+      color: var(--cyan);
+      border-color: rgba(0, 217, 255, 0.35);
+    }
+    .copy-btn-prominent:hover {
+      background: var(--cyan);
+      color: #050608;
+    }
+
+    /* Forms */
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #d1d5db;
+      margin-bottom: 0.35rem;
+    }
+    label .req {
+      color: var(--cyan);
+    }
+    label .opt {
+      font-size: 0.74rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
     input, textarea {
       width: 100%;
-      padding: 0.65rem 0.75rem;
-      background: #08090c;
+      padding: 0.7rem 0.85rem;
+      background: #090b10;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius-md);
       color: var(--text);
-      margin-bottom: 0.85rem;
+      margin-bottom: 1rem;
       font-size: 0.9rem;
+      font-family: inherit;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.2);
+    }
+    input[readonly] {
+      background: #07080b;
+      color: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .input-with-copy {
+      position: relative;
+      margin-bottom: 1rem;
+    }
+    .input-with-copy input {
+      margin-bottom: 0;
+      padding-right: 4.8rem;
+    }
+    .input-with-copy .copy-btn {
+      position: absolute;
+      right: 0.5rem;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .selected-slot-indicator {
+      display: none;
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--radius-sm);
+      background: rgba(0, 217, 255, 0.08);
+      border: 1px solid rgba(0, 217, 255, 0.3);
+      color: var(--text);
+      font-size: 0.82rem;
+      margin-bottom: 0.85rem;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* Buttons */
     button {
+      font-family: inherit;
       width: 100%;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
+      padding: 0.78rem 1rem;
+      border-radius: var(--radius-md);
       border: none;
       font-weight: 600;
       cursor: pointer;
       background: var(--cyan);
       color: #050608;
-      font-size: 0.9rem;
+      font-size: 0.92rem;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
     }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button:hover:not(:disabled) {
+      filter: brightness(1.1);
+      box-shadow: 0 0 16px var(--cyan-glow);
+    }
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      box-shadow: none !important;
+    }
     .btn-outline {
       width: auto;
-      padding: 0.4rem 0.8rem;
+      padding: 0.45rem 0.85rem;
       background: transparent;
       color: var(--text);
       border: 1px solid var(--border);
-      font-size: 0.8rem;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+    }
+    .btn-outline:hover:not(:disabled) {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      box-shadow: none;
     }
     .btn-danger {
       width: auto;
-      padding: 0.35rem 0.75rem;
-      background: rgba(255, 77, 109, 0.14);
+      padding: 0.38rem 0.75rem;
+      background: var(--danger-tint);
       color: var(--danger);
       border: 1px solid rgba(255, 77, 109, 0.4);
       font-size: 0.78rem;
+      border-radius: var(--radius-sm);
     }
-    .banner {
-      display: none;
-      padding: 0.85rem 1rem;
-      border-radius: 8px;
+    .btn-danger:hover:not(:disabled) {
+      background: rgba(255, 77, 109, 0.25);
+      border-color: var(--danger);
+      box-shadow: 0 0 10px rgba(255, 77, 109, 0.3);
+    }
+
+    /* Consolidated Success Receipt Card */
+    .receipt-card {
+      border-color: var(--emerald) !important;
+      background: linear-gradient(180deg, rgba(0, 255, 102, 0.05) 0%, var(--surface) 100%);
+      box-shadow: 0 0 30px rgba(0, 255, 102, 0.12), 0 4px 24px rgba(0,0,0,0.3) !important;
+      animation: fadeInScale 0.25s ease-out;
+    }
+    @keyframes fadeInScale {
+      0% { opacity: 0; transform: scale(0.97); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .receipt-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
       margin-bottom: 1.25rem;
-      font-size: 0.88rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(0, 255, 102, 0.2);
     }
-    .banner.success {
-      display: block;
-      background: rgba(0, 255, 102, 0.1);
-      border: 1px solid rgba(0, 255, 102, 0.4);
+    .receipt-title-group {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+    .receipt-title-group h2 {
       color: var(--emerald);
+      margin: 0;
+      font-size: 1.2rem;
     }
-    .banner.error {
-      display: block;
-      background: rgba(255, 77, 109, 0.12);
+    .receipt-subtitle {
+      font-size: 0.84rem;
+      color: var(--text-secondary);
+      margin-top: 0.2rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .status-confirmed {
+      background: rgba(0, 255, 102, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(0, 255, 102, 0.45);
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+    }
+    .status-cancelled {
+      background: var(--danger-tint);
+      color: var(--danger);
+      border: 1px solid rgba(255, 77, 109, 0.4);
+    }
+
+    /* Prominent Reference ID Box */
+    .receipt-ref-box {
+      background: #090b10;
+      border: 1px solid rgba(0, 255, 102, 0.3);
+      border-radius: var(--radius-md);
+      padding: 1rem 1.15rem;
+      margin-bottom: 1.25rem;
+      box-shadow: inset 0 0 16px rgba(0, 255, 102, 0.04);
+    }
+    .receipt-ref-label {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.45rem;
+    }
+    .receipt-ref-value-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .receipt-ref-value {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--emerald);
+      word-break: break-all;
+    }
+
+    /* Receipt Details Grid */
+    .receipt-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 540px) {
+      .receipt-grid { grid-template-columns: 1fr; }
+    }
+    .receipt-item {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: var(--radius-sm);
+      padding: 0.65rem 0.8rem;
+    }
+    .receipt-item.full-width {
+      grid-column: 1 / -1;
+    }
+    .receipt-item-label {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.15rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .receipt-item-value {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .receipt-notice {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 77, 109, 0.1);
+      border: 1px solid rgba(255, 77, 109, 0.35);
+      color: var(--danger);
+      font-size: 0.84rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Receipt Action Buttons */
+    .receipt-actions {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-top: 0.5rem;
+    }
+    .btn-receipt-action {
+      flex: 1;
+      min-width: 140px;
+      padding: 0.65rem 1rem;
+      font-size: 0.86rem;
+      font-weight: 600;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+    }
+    .btn-receipt-action.primary {
+      background: rgba(0, 217, 255, 0.12);
+      border: 1px solid rgba(0, 217, 255, 0.4);
+      color: var(--cyan);
+    }
+    .btn-receipt-action.primary:hover {
+      background: var(--cyan);
+      color: #050608;
+    }
+    .btn-receipt-action.danger {
+      background: var(--danger-tint);
       border: 1px solid rgba(255, 77, 109, 0.4);
       color: var(--danger);
     }
-    .mono { font-family: monospace; font-size: 0.78rem; color: var(--muted); }
+    .btn-receipt-action.danger:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    /* Patient Bookings list items */
     .booking-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0.7rem 0;
-      border-bottom: 1px solid var(--border);
-      gap: 0.75rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      gap: 1rem;
+    }
+    @media (max-width: 540px) {
+      .booking-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+    .booking-item:last-child {
+      border-bottom: none;
+    }
+    .booking-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .booking-header-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .booking-patient-name {
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: var(--text);
+    }
+
+    /* Lookup Single Result */
+    .lookup-card {
+      background: #090b10;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.95rem;
+      margin-top: 0.85rem;
+      animation: fadeIn 0.15s ease-out;
+    }
+    .lookup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <div>
-        <h1>Koya Clinic — Patient Appointment Booking</h1>
-        <p style="color:var(--muted); font-size:0.88rem;">Browse available times, book an appointment, and view or cancel existing bookings.</p>
+      <div class="header-title-group">
+        <span class="header-icon">🏥</span>
+        <div>
+          <h1>Koya Clinic — Patient Appointment Booking</h1>
+          <p class="header-subtitle">Browse available times, book an appointment, and view or cancel existing bookings.</p>
+        </div>
       </div>
       <span class="pill">Levels 1–5 Ready</span>
     </header>
 
-    <div id="banner" class="banner"></div>
+    <!-- Top Alert Banner (Used for Errors/General Alerts; Suppressed on Booking Success) -->
+    <div id="banner" class="banner" role="alert"></div>
 
     <div class="layout">
+      <!-- Left Column: Slots & Patient Bookings -->
       <div>
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.85rem;">
-            <h2 style="margin:0;">1. Select an Available Slot</h2>
-            <button class="btn-outline" onclick="fetchSlots()">Refresh</button>
+        <!-- Section 1: Slots -->
+        <div class="card" id="slotsSection">
+          <div class="card-header">
+            <h2><span>📅</span> 1. Select an Available Slot</h2>
+            <button type="button" class="btn-outline" onclick="fetchSlots()" title="Reload current available slots">
+              <span>↻ Refresh</span>
+            </button>
           </div>
-          <div id="slotsGrid" class="slots-grid">Loading available clinic slots...</div>
+          <div id="slotsGrid" class="slots-grid" aria-live="polite">Loading available clinic slots...</div>
         </div>
 
-        <div class="card">
-          <h2>3. Patient Bookings & Cursor Pagination</h2>
-          <div style="display:flex; gap:0.5rem; margin-bottom:0.75rem;">
-            <input type="email" id="searchEmail" placeholder="Filter by patient email..." style="margin:0;" />
-            <button class="btn-outline" onclick="loadFirstPage()">Filter</button>
+        <!-- Section 3: Patient Bookings & Cursor Pagination -->
+        <div class="card" id="bookingsSection">
+          <div class="card-header">
+            <h2><span>👥</span> 3. Patient Bookings &amp; Cursor Pagination</h2>
           </div>
-          <div id="bookingsList">Loading bookings...</div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.85rem;">
+          <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
+            <input type="email" id="searchEmail" placeholder="🔍 Filter by patient email (e.g. adaeze@example.com)..." style="margin:0;" />
+            <button type="button" class="btn-outline" onclick="loadFirstPage()" style="white-space:nowrap;">Filter</button>
+          </div>
+          <div id="bookingsList" aria-live="polite">Loading bookings...</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.15rem; flex-wrap:wrap; gap:0.5rem;">
             <span id="paginationStats" class="mono"></span>
             <div style="display:flex; gap:0.5rem;">
-              <button class="btn-outline" onclick="loadFirstPage()">First Page</button>
-              <button id="nextCursorBtn" class="btn-outline" style="display:none;" onclick="loadNextPage()">Next Page →</button>
+              <button type="button" class="btn-outline" onclick="loadFirstPage()">First Page</button>
+              <button type="button" id="nextCursorBtn" class="btn-outline" style="display:none;" onclick="loadNextPage()">Next Page →</button>
             </div>
           </div>
         </div>
       </div>
 
+      <!-- Right Column: Booking Form, Success Receipt, & Lookup -->
       <div>
-        <div class="card">
-          <h2>2. Complete Your Booking</h2>
+        <!-- Section 2: Complete Your Booking -->
+        <div class="card" id="bookingFormCard">
+          <div class="card-header">
+            <h2><span>📝</span> 2. Complete Your Booking</h2>
+          </div>
           <form id="bookForm" onsubmit="handleBookSubmit(event)">
-            <label>Selected Slot ID *</label>
-            <input type="text" id="slotId" placeholder="Click an available slot on the left" readonly required />
+            <label for="slotId">
+              <span>🆔</span> Selected Slot ID <span class="req">*</span>
+            </label>
+            <div id="slotSelectionSummary" class="selected-slot-indicator"></div>
+            <div class="input-with-copy">
+              <input type="text" id="slotId" placeholder="Click an available slot on the left" readonly required />
+              <button type="button" class="copy-btn" id="copySlotInputBtn" onclick="copySlotInputVal(this, event)" style="display:none;" title="Copy Selected Slot ID">
+                Copy
+              </button>
+            </div>
 
-            <label>Patient Full Name *</label>
+            <label for="patientName">
+              <span>👤</span> Patient Full Name <span class="req">*</span>
+            </label>
             <input type="text" id="patientName" placeholder="Adaeze Nwosu" required minlength="2" />
 
-            <label>Patient Email *</label>
+            <label for="patientEmail">
+              <span>📧</span> Patient Email <span class="req">*</span>
+            </label>
             <input type="email" id="patientEmail" placeholder="adaeze@example.com" required />
 
-            <label>Patient Phone (Optional)</label>
+            <label for="patientPhone">
+              <span>📱</span> Patient Phone <span class="opt">(Optional)</span>
+            </label>
             <input type="tel" id="patientPhone" placeholder="+234 803 123 4567" />
 
-            <label>Reason for Visit (Optional)</label>
+            <label for="reason">
+              <span>📋</span> Reason for Visit <span class="opt">(Optional)</span>
+            </label>
             <textarea id="reason" rows="2" placeholder="Annual physical consultation"></textarea>
 
-            <button type="submit" id="bookBtn">Book Appointment</button>
+            <button type="submit" id="bookBtn">
+              <span>✨ Book Appointment</span>
+            </button>
           </form>
         </div>
 
-        <div id="confirmationBox" class="card" style="display:none; border-color:var(--emerald);">
-          <h2 style="color:var(--emerald);">Confirmed Appointment Receipt</h2>
-          <div id="confirmationBody" style="font-size:0.9rem; line-height:1.7;"></div>
+        <!-- Consolidated Success Receipt Card (No duplicate top banner) -->
+        <div id="confirmationBox" class="card receipt-card" style="display:none;" role="region" aria-label="Appointment Confirmation Receipt">
+          <!-- Dynamically populated via renderSuccessReceipt -->
         </div>
 
-        <div class="card">
-          <h2>4. Look Up Single Booking by ID</h2>
-          <div style="display:flex; gap:0.5rem;">
-            <input type="text" id="lookupId" placeholder="Paste Booking UUID..." style="margin:0;" />
-            <button class="btn-outline" onclick="lookupSingleBooking()">Look Up</button>
+        <!-- Hidden container to maintain backwards-compatibility if scripts inspect confirmationBody -->
+        <div id="confirmationBody" style="display:none;"></div>
+
+        <!-- Section 4: Look Up Single Booking by ID -->
+        <div class="card" id="lookupSection">
+          <div class="card-header">
+            <h2><span>🔎</span> 4. Look Up Single Booking by ID</h2>
           </div>
-          <div id="lookupResult" style="margin-top:0.75rem; font-size:0.86rem;"></div>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="text" id="lookupId" placeholder="🆔 Paste Booking UUID..." style="margin:0;" />
+            <button type="button" class="btn-outline" onclick="lookupSingleBooking()" style="white-space:nowrap;">Look Up</button>
+          </div>
+          <div id="lookupResult" style="margin-top:0.75rem;" aria-live="polite"></div>
         </div>
       </div>
     </div>
@@ -241,9 +830,11 @@
         ? 'koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c'
         : '');
 
+    let cachedSlots = [];
     let selectedSlotId = '';
     let nextCursor = null;
     let currentIdempotencyKey = crypto.randomUUID();
+    let currentReceiptBooking = null;
 
     function buildHeaders(extra = {}) {
       const h = { 'Content-Type': 'application/json', ...extra };
@@ -253,8 +844,15 @@
 
     function notify(message, type = 'success') {
       const el = document.getElementById('banner');
+      if (!el) return;
       el.className = `banner ${type}`;
       el.textContent = message;
+      el.style.display = 'block';
+    }
+
+    function hideBanner() {
+      const el = document.getElementById('banner');
+      if (el) el.style.display = 'none';
     }
 
     function getErrorMessage(res, data) {
@@ -269,51 +867,204 @@
       );
     }
 
+    // Helper: Parse Doctor Name and Specialization
+    function parseDoctorInfo(providerStr) {
+      if (!providerStr) return { name: 'Clinic Physician', spec: 'General Practice' };
+      const match = String(providerStr).match(/^(.*?)\s*\((.*?)\)$/);
+      if (match) {
+        return { name: match[1].trim(), spec: match[2].trim() };
+      }
+      return { name: String(providerStr).trim(), spec: '' };
+    }
+
+    // Helper: Format Date & Time
+    function formatDateTime(dateStr, mode = 'short') {
+      if (!dateStr) return 'TBD';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return String(dateStr);
+      if (mode === 'long') {
+        return d.toLocaleString(undefined, {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit'
+        });
+      }
+      return d.toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // Task 2: Robust One-Click Copy Implementation
+    async function copyText(text, btnElement, event) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      if (!text) return;
+
+      let succeeded = false;
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(text);
+          succeeded = true;
+        } catch (_) {
+          // fallback to execCommand below
+        }
+      }
+
+      if (!succeeded) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.top = '-9999px';
+          ta.style.left = '-9999px';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          succeeded = document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (err) {
+          console.error('Clipboard copy failed:', err);
+        }
+      }
+
+      if (btnElement) {
+        const originalHtml = btnElement.innerHTML;
+        btnElement.innerHTML = 'Copied! ✨';
+        btnElement.classList.add('copied');
+        btnElement.setAttribute('aria-label', 'Copied to clipboard');
+        setTimeout(() => {
+          btnElement.innerHTML = originalHtml;
+          btnElement.classList.remove('copied');
+          btnElement.removeAttribute('aria-label');
+        }, 2000);
+      }
+    }
+
+    function copySlotInputVal(btn, event) {
+      const val = document.getElementById('slotId').value.trim();
+      copyText(val, btn, event);
+    }
+
+    // Task 1: Fetch and Render Slots with Instant Active Selection
     async function fetchSlots() {
       const grid = document.getElementById('slotsGrid');
       try {
         const res = await fetch(`${API_BASE}/slots`, { headers: buildHeaders() });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(getErrorMessage(res, data));
+
         const allSlots = Array.isArray(data.slots) ? data.slots : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
-        const slots = allSlots.filter(s => s.available !== false && s.is_available !== false);
+        cachedSlots = allSlots.filter(s => s.available !== false && s.is_available !== false);
 
-        if (slots.length === 0) {
-          grid.innerHTML = '<p style="color:var(--muted);">No available slots remaining.</p>';
-          return;
-        }
-
-        grid.innerHTML = slots.map(s => {
-          const dt = new Date(s.start || s.startTime || s.start_time).toLocaleString(undefined, {
-            weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-          });
-          const sel = s.id === selectedSlotId ? 'selected' : '';
-          return `
-            <div class="slot-card ${sel}" onclick="chooseSlot('${s.id}')">
-              <div class="slot-time">${dt}</div>
-              <div class="slot-doctor">${s.provider || s.doctorName || s.doctor_name}</div>
-              <div class="mono" style="margin-top:0.25rem;">${s.id.slice(0, 8)}…</div>
-            </div>
-          `;
-        }).join('');
+        renderSlots();
       } catch (err) {
-        grid.innerHTML = `<p style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
+        grid.innerHTML = `<p style="color:var(--danger); padding:0.5rem 0;">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
       }
     }
 
-    function chooseSlot(id) {
-      selectedSlotId = id;
-      document.getElementById('slotId').value = id;
-      currentIdempotencyKey = crypto.randomUUID();
-      fetchSlots();
+    function renderSlots() {
+      const grid = document.getElementById('slotsGrid');
+      if (!grid) return;
+
+      if (!cachedSlots || cachedSlots.length === 0) {
+        grid.innerHTML = '<p style="color:var(--muted); padding:0.5rem 0;">No available clinic slots remaining at this time.</p>';
+        return;
+      }
+
+      grid.innerHTML = cachedSlots.map(s => {
+        const isSelected = s.id === selectedSlotId;
+        const dt = formatDateTime(s.start || s.startTime || s.start_time, 'short');
+        const doc = parseDoctorInfo(s.provider || s.doctorName || s.doctor_name);
+
+        return `
+          <div
+            class="slot-card ${isSelected ? 'selected' : ''}"
+            onclick="chooseSlot('${s.id}')"
+            data-slot-id="${s.id}"
+            role="button"
+            tabindex="0"
+            aria-pressed="${isSelected}"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseSlot('${s.id}');}"
+          >
+            <div class="slot-card-top">
+              <div class="slot-time">
+                <span>🕒</span>
+                <span>${dt}</span>
+              </div>
+              ${isSelected ? '<span class="slot-badge-selected">✓ Selected</span>' : ''}
+            </div>
+            <div class="slot-doctor-info">
+              <div class="slot-doctor-name">
+                <span>🩺</span>
+                <span>${doc.name}</span>
+              </div>
+              ${doc.spec ? `<span class="slot-doctor-spec">${doc.spec}</span>` : ''}
+            </div>
+            <div class="slot-card-footer">
+              <span class="uuid-badge" title="${s.id}">${s.id.slice(0, 8)}…</span>
+              <button
+                type="button"
+                class="copy-btn"
+                onclick="copyText('${s.id}', this, event)"
+                title="Copy Slot UUID"
+                aria-label="Copy Slot UUID ${s.id.slice(0, 8)}"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
 
+    // Task 1: Move selection instantly without network delay
+    function chooseSlot(id) {
+      selectedSlotId = id;
+      const input = document.getElementById('slotId');
+      if (input) input.value = id;
+
+      const copyBtn = document.getElementById('copySlotInputBtn');
+      if (copyBtn) copyBtn.style.display = 'inline-flex';
+
+      const summary = document.getElementById('slotSelectionSummary');
+      const slotObj = cachedSlots.find(s => s.id === id);
+      if (summary && slotObj) {
+        const doc = parseDoctorInfo(slotObj.provider || slotObj.doctorName || slotObj.doctor_name);
+        const dt = formatDateTime(slotObj.start || slotObj.startTime || slotObj.start_time, 'short');
+        summary.innerHTML = `<span>✓</span> <strong>Selected:</strong> ${doc.name} ${doc.spec ? `(${doc.spec})` : ''} • ${dt}`;
+        summary.style.display = 'flex';
+      }
+
+      currentIdempotencyKey = crypto.randomUUID();
+      renderSlots();
+    }
+
+    // Task 3: Consolidated Success Receipt Card & Submission Handler
     async function handleBookSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('bookBtn');
+      const originalBtnHtml = btn.innerHTML;
       btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Booking Appointment...</span>';
 
       const slotVal = document.getElementById('slotId').value.trim();
+      if (!slotVal) {
+        notify('Please select an available appointment slot first.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+        return;
+      }
+
       const nameVal = document.getElementById('patientName').value.trim();
       const emailVal = document.getElementById('patientEmail').value.trim();
       const phoneVal = document.getElementById('patientPhone').value.trim();
@@ -342,33 +1093,225 @@
         if (!res.ok) throw new Error(getErrorMessage(res, data));
 
         const b = data.booking || data;
-        notify(`Appointment confirmed! Reference ID: ${b.id}`, 'success');
 
-        document.getElementById('confirmationBox').style.display = 'block';
-        document.getElementById('confirmationBody').innerHTML = `
-          <div><strong>Booking ID:</strong> <span class="mono">${b.id}</span></div>
-          <div><strong>Patient:</strong> ${b.name || b.patientName} (${b.email || b.patientEmail})</div>
-          <div><strong>Doctor:</strong> ${b.slot?.provider || b.slot?.doctorName || 'Clinic Physician'}</div>
-          <div><strong>Appointment Time:</strong> ${b.slot ? new Date(b.slot.start || b.slot.startTime).toLocaleString() : (b.slot_id || b.slotId)}</div>
-          <div><strong>Status:</strong> <span style="color:var(--emerald);">${b.status}</span></div>
-        `;
+        // Eliminate duplicate top banner
+        hideBanner();
 
+        // Render Consolidated Success Receipt
+        renderSuccessReceipt(b, {
+          slotId: slotVal,
+          patientName: nameVal,
+          patientEmail: emailVal,
+          patientPhone: phoneVal,
+          reason: reasonVal,
+        });
+
+        // Reset selection & prepare fresh key
         currentIdempotencyKey = crypto.randomUUID();
         selectedSlotId = '';
         document.getElementById('slotId').value = '';
+        const copySlotBtn = document.getElementById('copySlotInputBtn');
+        if (copySlotBtn) copySlotBtn.style.display = 'none';
+        const summary = document.getElementById('slotSelectionSummary');
+        if (summary) summary.style.display = 'none';
+
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
         notify(err.message || 'Unable to reach booking server. Please check API configuration.', 'error');
       } finally {
         btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
       }
     }
 
+    // Task 3: Render Single Beautiful Success Receipt Card
+    function renderSuccessReceipt(b, context = {}) {
+      currentReceiptBooking = b;
+      const box = document.getElementById('confirmationBox');
+      if (!box) return;
+
+      const matchedSlot = cachedSlots.find(s => s.id === (b.slot_id || b.slotId || context.slotId));
+      const doc = parseDoctorInfo(
+        b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name ||
+        matchedSlot?.provider || matchedSlot?.doctorName || matchedSlot?.doctor_name ||
+        'Clinic Physician'
+      );
+      const apptTime = formatDateTime(
+        b.slot?.start || b.slot?.startTime || b.slot?.start_time ||
+        matchedSlot?.start || matchedSlot?.startTime || matchedSlot?.start_time,
+        'long'
+      );
+
+      const patientName = b.name || b.patientName || context.patientName || 'Patient';
+      const patientEmail = b.email || b.patientEmail || context.patientEmail || '';
+      const patientPhone = b.patientPhone || context.patientPhone || '';
+      const reason = b.reason || context.reason || '';
+      const status = (b.status || 'confirmed').toLowerCase();
+
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div class="receipt-header">
+          <div class="receipt-title-group">
+            <span style="font-size:1.75rem;">🎉</span>
+            <div>
+              <h2>Appointment Confirmed!</h2>
+              <p class="receipt-subtitle">Your appointment has been registered with Koya Clinic.</p>
+            </div>
+          </div>
+          <span class="status-badge status-${status}" id="receiptStatusBadge">✓ ${status.toUpperCase()}</span>
+        </div>
+
+        <div class="receipt-ref-box">
+          <div class="receipt-ref-label">
+            <span>🆔 Booking Reference ID</span>
+            <span style="color:var(--text-secondary); font-size:0.72rem; text-transform:none; font-weight:normal;">One-click copy for easy lookup</span>
+          </div>
+          <div class="receipt-ref-value-row">
+            <span class="receipt-ref-value" id="receiptRefId">${b.id}</span>
+            <button
+              type="button"
+              class="copy-btn copy-btn-prominent"
+              onclick="copyText('${b.id}', this, event)"
+              title="Copy Reference ID"
+              aria-label="Copy Reference ID"
+            >
+              <span>Copy</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="receipt-grid">
+          <div class="receipt-item">
+            <div class="receipt-item-label"><span>🩺</span> Doctor Name</div>
+            <div class="receipt-item-value">${doc.name}</div>
+          </div>
+          <div class="receipt-item">
+            <div class="receipt-item-label"><span>🔬</span> Specialization</div>
+            <div class="receipt-item-value">${doc.spec || 'General Practice'}</div>
+          </div>
+          <div class="receipt-item full-width">
+            <div class="receipt-item-label"><span>🕒</span> Appointment Date &amp; Time</div>
+            <div class="receipt-item-value" style="color:var(--cyan);">${apptTime}</div>
+          </div>
+          <div class="receipt-item">
+            <div class="receipt-item-label"><span>👤</span> Patient Name</div>
+            <div class="receipt-item-value">${patientName}</div>
+          </div>
+          <div class="receipt-item">
+            <div class="receipt-item-label"><span>📧</span> Patient Email</div>
+            <div class="receipt-item-value">${patientEmail}</div>
+          </div>
+          ${patientPhone ? `
+          <div class="receipt-item">
+            <div class="receipt-item-label"><span>📱</span> Phone Number</div>
+            <div class="receipt-item-value">${patientPhone}</div>
+          </div>` : ''}
+          ${reason ? `
+          <div class="receipt-item full-width">
+            <div class="receipt-item-label"><span>📋</span> Reason for Visit</div>
+            <div class="receipt-item-value">${reason}</div>
+          </div>` : ''}
+        </div>
+
+        <div id="receiptNotice" class="receipt-notice" style="display:none;"></div>
+
+        <div class="receipt-actions">
+          <button type="button" class="btn-receipt-action primary" onclick="bookAnotherAppointment()">
+            <span>+ Book Another</span>
+          </button>
+          <button type="button" class="btn-receipt-action danger" id="receiptCancelBtn" onclick="cancelReceiptBooking('${b.id}')">
+            <span>✕ Cancel Booking</span>
+          </button>
+        </div>
+      `;
+
+      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // Quick Action: Book Another
+    function bookAnotherAppointment() {
+      const form = document.getElementById('bookForm');
+      if (form) {
+        document.getElementById('patientName').value = '';
+        document.getElementById('patientEmail').value = '';
+        document.getElementById('patientPhone').value = '';
+        document.getElementById('reason').value = '';
+      }
+      selectedSlotId = '';
+      document.getElementById('slotId').value = '';
+      const copyBtn = document.getElementById('copySlotInputBtn');
+      if (copyBtn) copyBtn.style.display = 'none';
+      const summary = document.getElementById('slotSelectionSummary');
+      if (summary) summary.style.display = 'none';
+
+      currentIdempotencyKey = crypto.randomUUID();
+      renderSlots();
+
+      const slotsSec = document.getElementById('slotsSection');
+      if (slotsSec) {
+        slotsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // Quick Action: Cancel Booking from Receipt
+    async function cancelReceiptBooking(id) {
+      if (!confirm('Are you sure you want to cancel this booking? This will reopen the slot immediately.')) {
+        return;
+      }
+      const cancelBtn = document.getElementById('receiptCancelBtn');
+      if (cancelBtn) {
+        cancelBtn.disabled = true;
+        cancelBtn.innerHTML = '<span>Cancelling...</span>';
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: buildHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(getErrorMessage(res, data));
+
+        const badge = document.getElementById('receiptStatusBadge');
+        if (badge) {
+          badge.className = 'status-badge status-cancelled';
+          badge.textContent = '✕ CANCELLED';
+        }
+
+        if (cancelBtn) {
+          cancelBtn.innerHTML = '<span>Cancelled</span>';
+          cancelBtn.disabled = true;
+        }
+
+        const notice = document.getElementById('receiptNotice');
+        if (notice) {
+          notice.textContent = `Booking ${id} was cancelled. The slot is now available again.`;
+          notice.style.display = 'block';
+        }
+
+        await fetchSlots();
+        await loadFirstPage();
+      } catch (err) {
+        alert(err.message || 'Unable to cancel booking.');
+        if (cancelBtn) {
+          cancelBtn.disabled = false;
+          cancelBtn.innerHTML = '<span>✕ Cancel Booking</span>';
+        }
+      }
+    }
+
+    // Section 4: Look Up Single Booking with Copyable UUIDs
     async function lookupSingleBooking() {
-      const id = document.getElementById('lookupId').value.trim();
+      const idInput = document.getElementById('lookupId');
+      const id = idInput ? idInput.value.trim() : '';
       const out = document.getElementById('lookupResult');
-      if (!id) return;
+      if (!id) {
+        if (out) out.innerHTML = `<span style="color:var(--danger); font-size:0.86rem;">Please enter a Booking Reference ID.</span>`;
+        return;
+      }
+      if (out) out.innerHTML = `<span style="color:var(--muted); font-size:0.86rem;">Searching booking records...</span>`;
+
       try {
         const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
           headers: buildHeaders(),
@@ -376,17 +1319,44 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(getErrorMessage(res, data));
         const b = data.booking || data;
+        const isConfirmed = (b.status || '').toLowerCase() === 'confirmed';
+
         out.innerHTML = `
-          <div style="padding:0.65rem; border:1px solid var(--border); border-radius:8px;">
-            <div><strong>${b.name || b.patientName}</strong> — <span class="mono">${b.status}</span></div>
-            <div class="mono">Email: ${b.email || b.patientEmail} | Slot: ${b.slot_id || b.slotId}</div>
+          <div class="lookup-card">
+            <div class="lookup-header">
+              <div>
+                <strong>👤 ${b.name || b.patientName || 'Patient'}</strong>
+                <span class="status-badge status-${(b.status || '').toLowerCase()}" style="margin-left:0.5rem;">
+                  ${(b.status || '').toUpperCase()}
+                </span>
+              </div>
+              ${isConfirmed ? `<button type="button" class="btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>` : ''}
+            </div>
+            <div style="font-size:0.84rem; display:flex; flex-direction:column; gap:0.4rem;">
+              <div class="uuid-row">
+                <span style="color:var(--muted);">🆔 Ref ID:</span>
+                <span class="uuid-badge">${b.id}</span>
+                <button type="button" class="copy-btn" onclick="copyText('${b.id}', this, event)" title="Copy Reference ID">Copy</button>
+              </div>
+              <div style="color:var(--text-secondary);">
+                <span>📧 ${b.email || b.patientEmail}</span>
+                ${b.patientPhone ? ` • <span>📱 ${b.patientPhone}</span>` : ''}
+              </div>
+              ${(b.slot_id || b.slotId) ? `
+              <div class="uuid-row">
+                <span style="color:var(--muted);">📅 Slot ID:</span>
+                <span class="uuid-badge">${b.slot_id || b.slotId}</span>
+                <button type="button" class="copy-btn" onclick="copyText('${b.slot_id || b.slotId}', this, event)" title="Copy Slot UUID">Copy</button>
+              </div>` : ''}
+            </div>
           </div>
         `;
       } catch (err) {
-        out.innerHTML = `<span style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</span>`;
+        if (out) out.innerHTML = `<span style="color:var(--danger); font-size:0.86rem;">${err.message || 'Unable to locate booking with that ID.'}</span>`;
       }
     }
 
+    // Section 3: Patient Bookings & Pagination with Copyable UUIDs
     async function loadFirstPage() {
       nextCursor = null;
       await fetchBookings();
@@ -416,35 +1386,99 @@
         document.getElementById('paginationStats').textContent = `Showing ${items.length} of ${data.total ?? items.length} total`;
 
         if (items.length === 0) {
-          listEl.innerHTML = '<p style="color:var(--muted);">No bookings found.</p>';
+          listEl.innerHTML = '<p style="color:var(--muted); padding:0.5rem 0;">No bookings found matching criteria.</p>';
           return;
         }
 
-        listEl.innerHTML = items.map(b => `
-          <div class="booking-item">
-            <div>
-              <div><strong>${b.name || b.patientName}</strong> <span class="mono">[${b.status}]</span></div>
-              <div class="mono">${b.id}</div>
+        listEl.innerHTML = items.map(b => {
+          const status = (b.status || 'confirmed').toLowerCase();
+          const isConfirmed = status === 'confirmed';
+
+          return `
+            <div class="booking-item">
+              <div class="booking-info">
+                <div class="booking-header-row">
+                  <span class="booking-patient-name">👤 ${b.name || b.patientName || 'Patient'}</span>
+                  <span class="status-badge status-${status}">[${status}]</span>
+                </div>
+                <div class="uuid-row">
+                  <span class="uuid-badge" title="${b.id}">🆔 ${b.id}</span>
+                  <button
+                    type="button"
+                    class="copy-btn"
+                    onclick="copyText('${b.id}', this, event)"
+                    title="Copy Reference ID"
+                    aria-label="Copy Reference ID ${b.id}"
+                  >
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-outline"
+                    style="padding:0.18rem 0.45rem; font-size:0.72rem;"
+                    onclick="fillLookupId('${b.id}')"
+                    title="Fill into Look Up section"
+                  >
+                    Inspect
+                  </button>
+                </div>
+              </div>
+              <div>
+                ${isConfirmed
+                  ? `<button type="button" class="btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>`
+                  : ''}
+              </div>
             </div>
-            ${b.status?.toLowerCase() === 'confirmed'
-              ? `<button class="btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>`
-              : ''}
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (err) {
-        listEl.innerHTML = `<p style="color:var(--danger);">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
+        listEl.innerHTML = `<p style="color:var(--danger); padding:0.5rem 0;">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
+      }
+    }
+
+    function fillLookupId(id) {
+      const lookupInput = document.getElementById('lookupId');
+      if (lookupInput) {
+        lookupInput.value = id;
+        lookupSingleBooking();
+        const sec = document.getElementById('lookupSection');
+        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
 
     async function cancelBooking(id) {
+      if (!confirm(`Are you sure you want to cancel booking ${id}?`)) {
+        return;
+      }
       try {
-        const res = await fetch(`${API_BASE}/bookings/${id}`, {
+        const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
           method: 'DELETE',
           headers: buildHeaders(),
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(getErrorMessage(res, data));
-        notify(`Booking ${id} cancelled. Slot is now open again.`, 'success');
+
+        notify(`Booking ${id} was cancelled. The slot has reopened.`, 'success');
+
+        // Update receipt card if this was the active one
+        if (currentReceiptBooking && currentReceiptBooking.id === id) {
+          const badge = document.getElementById('receiptStatusBadge');
+          if (badge) {
+            badge.className = 'status-badge status-cancelled';
+            badge.textContent = '✕ CANCELLED';
+          }
+          const cancelBtn = document.getElementById('receiptCancelBtn');
+          if (cancelBtn) {
+            cancelBtn.innerHTML = '<span>Cancelled</span>';
+            cancelBtn.disabled = true;
+          }
+          const notice = document.getElementById('receiptNotice');
+          if (notice) {
+            notice.textContent = `Booking ${id} was cancelled.`;
+            notice.style.display = 'block';
+          }
+        }
+
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
@@ -452,6 +1486,7 @@
       }
     }
 
+    // Initialize application
     fetchSlots();
     loadFirstPage();
   </script>
