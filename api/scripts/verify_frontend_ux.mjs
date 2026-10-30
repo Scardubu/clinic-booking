@@ -60,19 +60,29 @@ class MockElement {
   querySelector(sel) {
     if (sel === '.slot-card-top') return this.children.find(c => c.className === 'slot-card-top') || null;
     if (sel === '.slot-badge-selected') return this.children.find(c => c.className === 'slot-badge-selected') || null;
+    if (sel === '.slot-card.selected') return this.children.find(c => c.classList.contains('slot-card') && c.classList.contains('selected')) || null;
+    if (sel === '.slot-card') return this.children.find(c => c.classList.contains('slot-card')) || null;
+    if (sel === '.booking-item') return this.children.find(c => c.classList.contains('booking-item')) || null;
+    if (sel.startsWith('[data-booking-id=')) {
+      const match = sel.match(/\[data-booking-id="?([^"\]]+)"?\]/);
+      if (match) return this.children.find(c => c.getAttribute('data-booking-id') === match[1]) || null;
+    }
+    if (sel === 'button') return this.children.find(c => c.tagName === 'BUTTON') || null;
     return null;
   }
   querySelectorAll(sel) {
     if (sel === '.slot-card') return this.children.filter(c => c.classList.contains('slot-card'));
+    if (sel === '.booking-item') return this.children.filter(c => c.classList.contains('booking-item'));
     return [];
   }
-  appendChild(child) { this.children.push(child); return child; }
+  appendChild(child) { child.parent = this; this.children.push(child); return child; }
   remove() {
     if (this.parent) {
       this.parent.children = this.parent.children.filter(x => x !== this);
     }
   }
-  scrollIntoView() {}
+  scrollIntoView() { this._scrolled = true; }
+  focus() { this._focused = true; }
 }
 
 const elements = {
@@ -84,6 +94,7 @@ const elements = {
   slotId: new MockElement('input', 'slotId'),
   copySlotInputBtn: new MockElement('button', 'copySlotInputBtn'),
   slotSelectionSummary: new MockElement('div', 'slotSelectionSummary'),
+  bookForm: new MockElement('form', 'bookForm'),
   patientName: new MockElement('input', 'patientName'),
   patientEmail: new MockElement('input', 'patientEmail'),
   patientPhone: new MockElement('input', 'patientPhone'),
@@ -95,6 +106,7 @@ const elements = {
   lookupResult: new MockElement('div', 'lookupResult'),
   searchEmail: new MockElement('input', 'searchEmail'),
   slotsSection: new MockElement('div', 'slotsSection'),
+  bookingsSection: new MockElement('div', 'bookingsSection'),
   lookupSection: new MockElement('div', 'lookupSection'),
   receiptStatusBadge: new MockElement('span', 'receiptStatusBadge'),
   receiptCancelBtn: new MockElement('button', 'receiptCancelBtn'),
@@ -372,6 +384,100 @@ console.log('=== Running Frontend Verification Tests ===\n');
   // Test Section 4 initial empty state in HTML
   assert(html.includes('Enter your Booking Reference ID above to retrieve your appointment details'), 'Section 4 has helpful instructional initial state in HTML');
   console.log('[PASS] Test 12: Section 3 and Section 4 display friendly, instructional empty state messaging');
+}
+
+// Test 13: fetchSlots() synchronizes window.cachedSlots and updateSelectedSlotUI resolves it
+{
+  const prevFetch = context.fetch;
+  context.fetch = async (url) => {
+    if (url.includes('/slots')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          slots: [{
+            id: 'slot-synced-111',
+            provider: 'Dr. Obinna Eze (Orthopedics)',
+            start: '2026-11-12T09:00:00Z',
+            available: true
+          }]
+        })
+      };
+    }
+    return { ok: true, status: 200, json: async () => ({}) };
+  };
+
+  await context.fetchSlots();
+  assert(Array.isArray(context.window.cachedSlots), 'window.cachedSlots is an array');
+  assert.strictEqual(context.window.cachedSlots[0]?.id, 'slot-synced-111', 'window.cachedSlots synchronized with fetched slots');
+
+  context.updateSelectedSlotUI('slot-synced-111');
+  assert(elements.slotSelectionSummary.innerHTML.includes('Dr. Obinna Eze'), 'Summary card resolved doctor from synchronized slots');
+  assert(elements.slotSelectionSummary.innerHTML.includes('Orthopedics'), 'Summary card resolved specialization from synchronized slots');
+
+  context.fetch = prevFetch;
+  console.log('[PASS] Test 13: fetchSlots() synchronizes window.cachedSlots ensuring runtime slot lookup succeeds');
+}
+
+// Test 14: Specialization fallback when provider has no parentheses
+{
+  context.window.cachedSlots = [{
+    id: 'slot-no-spec',
+    provider: 'Dr. Ngozi Okonjo',
+    start: '2026-11-15T11:00:00Z'
+  }];
+  context.updateSelectedSlotUI('slot-no-spec');
+  assert(elements.slotSelectionSummary.innerHTML.includes('Dr. Ngozi Okonjo'), 'Doctor name displayed');
+  assert(elements.slotSelectionSummary.innerHTML.includes('General Practice'), 'Displays General Practice specialization fallback');
+  console.log('[PASS] Test 14: updateSelectedSlotUI() displays General Practice specialization fallback when provider lacks parentheses');
+}
+
+// Test 15: bookAnotherAppointment() hides receipt card and clears form inputs
+{
+  elements.confirmationBox.style.display = 'block';
+  elements.patientName.value = 'Existing Name';
+  elements.patientEmail.value = 'test@example.com';
+  elements.patientPhone.value = '+234 111 222 3333';
+  elements.reason.value = 'Headache';
+
+  context.bookAnotherAppointment();
+  assert.strictEqual(elements.confirmationBox.style.display, 'none', 'confirmationBox is hidden on bookAnotherAppointment');
+  assert.strictEqual(elements.patientName.value, '', 'patientName is cleared');
+  assert.strictEqual(elements.patientEmail.value, '', 'patientEmail is cleared');
+  assert.strictEqual(elements.patientPhone.value, '', 'patientPhone is cleared');
+  assert.strictEqual(elements.reason.value, '', 'reason is cleared');
+  assert.strictEqual(elements.slotId.value, '', 'slotId is reset');
+  console.log('[PASS] Test 15: bookAnotherAppointment() hides receipt card and clears all booking input fields');
+}
+
+// Test 16: scrollToBookings(targetId) focuses and targets matching data-booking-id
+{
+  elements.bookingsSection.children = [];
+  const b1 = new MockElement('div');
+  b1.classList.add('booking-item');
+  b1.setAttribute('data-booking-id', 'booking-old-1');
+  elements.bookingsSection.children.push(b1);
+
+  const b2 = new MockElement('div');
+  b2.classList.add('booking-item');
+  b2.setAttribute('data-booking-id', 'booking-new-2');
+  elements.bookingsSection.children.push(b2);
+
+  context.scrollToBookings('booking-new-2');
+  assert.strictEqual(b2._focused, true, 'Targeted booking is focused');
+  assert.strictEqual(b2._scrolled, true, 'Targeted booking is scrolled into view');
+  assert(b2.classList.contains('booking-item-highlight'), 'Targeted booking receives glowing highlight');
+  console.log('[PASS] Test 16: scrollToBookings(id) scrolls to, focuses, and highlights targeted newly created booking');
+}
+
+// Test 17: Section 4 clearLookup() resets input and restores instructional empty state
+{
+  elements.lookupId.value = 'stale-reference-id';
+  elements.lookupResult.innerHTML = '<div class="lookup-card">Some Old Data</div>';
+  context.clearLookup();
+  assert.strictEqual(elements.lookupId.value, '', 'lookupId is cleared');
+  assert(elements.lookupResult.innerHTML.includes('Look up your appointment'), 'lookupResult restored to instructional empty state');
+  console.log('[PASS] Test 17: clearLookup() resets reference ID and restores welcoming instructional state');
 }
 
 setTimeout(() => {

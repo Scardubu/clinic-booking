@@ -400,6 +400,10 @@
       box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.22);
       background: #0c0f17;
     }
+    input:focus-visible, textarea:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 1px;
+    }
     input[readonly] {
       background: #07080b;
       color: #94a3b8;
@@ -416,6 +420,15 @@
       background: #090b10;
       border: 1px dashed var(--border);
       padding: 1rem 1.15rem;
+      cursor: pointer;
+    }
+    .selected-slot-card.empty:hover {
+      border-color: rgba(0, 217, 255, 0.45);
+      background: rgba(0, 217, 255, 0.03);
+    }
+    .selected-slot-card.empty:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
     }
     .selected-slot-empty {
       display: flex;
@@ -851,6 +864,16 @@
     .booking-item:last-child {
       border-bottom: none;
     }
+    .booking-item-highlight {
+      animation: highlightPulse 2.5s ease-out;
+      border-left: 3px solid var(--emerald);
+      padding-left: 0.65rem;
+    }
+    @keyframes highlightPulse {
+      0% { background: rgba(0, 255, 102, 0.22); }
+      50% { background: rgba(0, 255, 102, 0.08); }
+      100% { background: transparent; }
+    }
     .booking-info {
       display: flex;
       flex-direction: column;
@@ -917,7 +940,15 @@
               <span>↻ Refresh</span>
             </button>
           </div>
-          <div id="slotsGrid" class="slots-grid" aria-live="polite">Loading available clinic slots...</div>
+          <div id="slotsGrid" class="slots-grid" aria-live="polite">
+            <div class="empty-state small" style="grid-column: 1 / -1;">
+              <span class="empty-state-icon">⏳</span>
+              <div>
+                <div class="empty-state-title">Loading available clinic slots...</div>
+                <p class="empty-state-desc">Fetching upcoming openings from the clinic schedule.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Section 3: Patient Bookings & Cursor Pagination -->
@@ -928,7 +959,7 @@
           <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
             <input type="email" id="searchEmail" placeholder="🔍 Filter by patient email (e.g. adaeze@example.com)..." aria-label="Filter appointments by patient email" onkeydown="if(event.key==='Enter'){event.preventDefault();loadFirstPage();}" style="margin:0;" />
             <button type="button" class="btn-outline" onclick="loadFirstPage()" style="white-space:nowrap;">Filter</button>
-            <button type="button" class="btn-outline" onclick="clearEmailFilter()" style="white-space:nowrap;" title="Clear email filter and show all bookings">Clear</button>
+            <button type="button" class="btn-outline" onclick="clearEmailFilter()" style="white-space:nowrap;" title="Clear email filter and show all bookings" aria-label="Clear email filter">Clear</button>
           </div>
           <div id="bookingsList" aria-live="polite">
             <div class="empty-state">
@@ -959,10 +990,10 @@
             <input type="hidden" id="slotId" name="slotId" value="" />
             <button type="button" id="copySlotInputBtn" style="display:none;" aria-hidden="true"></button>
 
-            <label style="margin-bottom:0.45rem;">
+            <label id="selectedSlotLabel" style="margin-bottom:0.45rem;">
               <span>📅</span> Selected Appointment Slot <span class="req">*</span>
             </label>
-            <div id="slotSelectionSummary" class="selected-slot-card empty" role="region" aria-live="polite">
+            <div id="slotSelectionSummary" class="selected-slot-card empty" role="region" aria-labelledby="selectedSlotLabel" aria-live="polite" tabindex="0" onclick="changeSlot()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();changeSlot();}" title="Click to choose a slot from Step 1">
               <div class="selected-slot-empty">
                 <span class="selected-slot-empty-icon">📅</span>
                 <div class="selected-slot-empty-text">
@@ -1014,6 +1045,7 @@
           <div style="display:flex; gap:0.5rem;">
             <input type="text" id="lookupId" placeholder="Paste Booking Reference ID (e.g. 1643a64e-...)" aria-label="Booking Reference ID" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupSingleBooking();}" style="margin:0;" />
             <button type="button" class="btn-outline" onclick="lookupSingleBooking()" style="white-space:nowrap;">Look Up</button>
+            <button type="button" class="btn-outline" onclick="clearLookup()" style="white-space:nowrap;" title="Clear reference ID search" aria-label="Clear reference ID search">Clear</button>
           </div>
           <div id="lookupResult" style="margin-top:0.75rem;" aria-live="polite">
             <div class="empty-state small">
@@ -1039,11 +1071,22 @@
         ? 'koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c'
         : '');
 
-    let cachedSlots = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots)) ? window.cachedSlots : [];
+    function generateUUID() {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    }
+
+    let cachedSlots = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots) && window.cachedSlots.length > 0) ? window.cachedSlots : [];
     if (typeof window !== 'undefined') window.cachedSlots = cachedSlots;
     let selectedSlotId = '';
     let nextCursor = null;
-    let currentIdempotencyKey = crypto.randomUUID();
+    let currentIdempotencyKey = generateUUID();
     let currentReceiptBooking = null;
 
     function buildHeaders(extra = {}) {
@@ -1197,6 +1240,14 @@
         }, 2000);
       }
 
+      if (succeeded && currentReceiptBooking && text === currentReceiptBooking.id) {
+        const notice = document.getElementById('receiptCopiedNotice');
+        if (notice) {
+          notice.textContent = '✨ Copied to clipboard';
+          notice.style.display = 'inline-flex';
+        }
+      }
+
       return succeeded;
     }
 
@@ -1220,11 +1271,14 @@
         return;
       }
 
-      const slotsList = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots)) ? window.cachedSlots : cachedSlots;
+      const slotsList = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots) && window.cachedSlots.length > 0)
+        ? window.cachedSlots
+        : cachedSlots;
       const slotObj = slotsList.find(s => s.id === id);
       const doc = slotObj ? parseDoctorInfo(slotObj.provider || slotObj.doctorName || slotObj.doctor_name) : { name: 'Clinic Physician', spec: 'General Practice' };
       const rawDate = slotObj ? (slotObj.start || slotObj.startTime || slotObj.start_time) : null;
       const dtLong = rawDate ? formatDateTime(rawDate, 'long') : 'Selected Appointment Time';
+      const specDisplay = doc.spec || 'General Practice';
 
       summary.className = 'selected-slot-card active';
       summary.innerHTML = `
@@ -1238,7 +1292,7 @@
           <div class="selected-slot-item">
             <div class="selected-slot-item-label"><span>🩺</span> Doctor</div>
             <div class="selected-slot-item-val">${escapeHtml(doc.name)}</div>
-            ${doc.spec ? `<span class="selected-slot-spec">${escapeHtml(doc.spec)}</span>` : ''}
+            <span class="selected-slot-spec">${escapeHtml(specDisplay)}</span>
           </div>
           <div class="selected-slot-item">
             <div class="selected-slot-item-label"><span>🕒</span> Date &amp; Time</div>
@@ -1256,8 +1310,13 @@
           slotsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         const targetSlot = slotsSec.querySelector('.slot-card.selected') || slotsSec.querySelector('.slot-card');
-        if (targetSlot && typeof targetSlot.focus === 'function') {
-          targetSlot.focus();
+        if (targetSlot) {
+          if (typeof targetSlot.scrollIntoView === 'function') {
+            targetSlot.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          if (typeof targetSlot.focus === 'function') {
+            targetSlot.focus();
+          }
         } else {
           const refreshBtn = slotsSec.querySelector('button');
           if (refreshBtn && typeof refreshBtn.focus === 'function') refreshBtn.focus();
@@ -1265,17 +1324,29 @@
       }
     }
 
-    // UI Helper: Scroll to Section 3 (Patient Bookings)
-    function scrollToBookings() {
+    // UI Helper: Scroll to Section 3 (Patient Bookings) and highlight targeted booking
+    function scrollToBookings(targetBookingId) {
+      const idToFocus = targetBookingId || (currentReceiptBooking && currentReceiptBooking.id);
       const sec = document.getElementById('bookingsSection');
       if (sec) {
         if (typeof sec.scrollIntoView === 'function') {
           sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        const firstItem = sec.querySelector('.booking-item');
-        if (firstItem) {
-          firstItem.setAttribute('tabindex', '-1');
-          if (typeof firstItem.focus === 'function') firstItem.focus();
+        let targetEl = null;
+        if (idToFocus) {
+          targetEl = sec.querySelector(`[data-booking-id="${idToFocus}"]`);
+        }
+        if (!targetEl) {
+          targetEl = sec.querySelector('.booking-item');
+        }
+        if (targetEl) {
+          targetEl.setAttribute('tabindex', '-1');
+          if (typeof targetEl.scrollIntoView === 'function') {
+            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          if (typeof targetEl.focus === 'function') targetEl.focus();
+          targetEl.classList.add('booking-item-highlight');
+          setTimeout(() => targetEl.classList.remove('booking-item-highlight'), 3000);
         } else {
           const emailInput = document.getElementById('searchEmail');
           if (emailInput && typeof emailInput.focus === 'function') emailInput.focus();
@@ -1289,6 +1360,24 @@
       if (input) {
         input.value = '';
         loadFirstPage();
+      }
+    }
+
+    // UI Helper: Clear Section 4 lookup search
+    function clearLookup() {
+      const input = document.getElementById('lookupId');
+      if (input) input.value = '';
+      const out = document.getElementById('lookupResult');
+      if (out) {
+        out.innerHTML = `
+          <div class="empty-state small">
+            <span class="empty-state-icon">🔍</span>
+            <div>
+              <div class="empty-state-title">Look up your appointment</div>
+              <p class="empty-state-desc">Enter your Booking Reference ID above to retrieve your appointment details, check confirmation status, or cancel a booking.</p>
+            </div>
+          </div>
+        `;
       }
     }
 
@@ -1308,6 +1397,7 @@
 
         const allSlots = Array.isArray(data.slots) ? data.slots : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
         cachedSlots = allSlots.filter(s => s.available !== false && s.is_available !== false);
+        if (typeof window !== 'undefined') window.cachedSlots = cachedSlots;
 
         renderSlots();
       } catch (err) {
@@ -1319,7 +1409,11 @@
       const grid = document.getElementById('slotsGrid');
       if (!grid) return;
 
-      if (!cachedSlots || cachedSlots.length === 0) {
+      const slotsList = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots) && window.cachedSlots.length > 0)
+        ? window.cachedSlots
+        : cachedSlots;
+
+      if (!slotsList || slotsList.length === 0) {
         grid.innerHTML = `
           <div class="empty-state" style="grid-column: 1 / -1; padding: 2rem 1.25rem;">
             <span class="empty-state-icon">🕒</span>
@@ -1332,7 +1426,7 @@
 
       const prevScroll = grid.scrollTop;
 
-      grid.innerHTML = cachedSlots.map(s => {
+      grid.innerHTML = slotsList.map(s => {
         const isSelected = s.id === selectedSlotId;
         const dt = formatDateTime(s.start || s.startTime || s.start_time, 'short');
         const doc = parseDoctorInfo(s.provider || s.doctorName || s.doctor_name);
@@ -1393,7 +1487,7 @@
 
       updateSelectedSlotUI(id);
 
-      currentIdempotencyKey = crypto.randomUUID();
+      currentIdempotencyKey = generateUUID();
 
       // Smooth in-place update of slot cards without recreating DOM elements, preserving scroll position and keyboard focus
       const grid = document.getElementById('slotsGrid');
@@ -1489,12 +1583,22 @@
         });
 
         // Smart Post-Booking Flow: auto-copy booking Reference ID to clipboard
+        let autoCopied = false;
         if (b && b.id) {
-          copyText(b.id, null);
+          autoCopied = await copyText(b.id, null);
         }
 
+        // Render Consolidated Success Receipt
+        renderSuccessReceipt(b, {
+          slotId: slotVal,
+          patientName: nameVal,
+          patientEmail: emailVal,
+          patientPhone: phoneVal,
+          reason: reasonVal,
+        }, { autoCopied });
+
         // Reset selection & prepare fresh key
-        currentIdempotencyKey = crypto.randomUUID();
+        currentIdempotencyKey = generateUUID();
         selectedSlotId = '';
         const slotInput = document.getElementById('slotId');
         if (slotInput) slotInput.value = '';
@@ -1521,14 +1625,16 @@
     }
 
     // Task 3: Render Single Beautiful Success Receipt Card
-    // Task 3: Render Single Beautiful Success Receipt Card
-    function renderSuccessReceipt(b, context = {}) {
+    function renderSuccessReceipt(b, context = {}, options = {}) {
       currentReceiptBooking = b;
       const box = document.getElementById('confirmationBox');
       if (!box) return;
 
       const slotId = b.slot_id || b.slotId || (b.slot && b.slot.id) || context.slotId || '';
-      const matchedSlot = cachedSlots.find(s => s.id === slotId);
+      const slotsList = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots) && window.cachedSlots.length > 0)
+        ? window.cachedSlots
+        : cachedSlots;
+      const matchedSlot = slotsList.find(s => s.id === slotId);
       const doc = parseDoctorInfo(
         b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name ||
         matchedSlot?.provider || matchedSlot?.doctorName || matchedSlot?.doctor_name ||
@@ -1545,6 +1651,7 @@
       const patientPhone = b.patientPhone || context.patientPhone || '';
       const reason = b.reason || context.reason || '';
       const status = (b.status || 'confirmed').toLowerCase();
+      const autoCopied = options.autoCopied !== false;
 
       box.style.display = 'block';
       box.innerHTML = `
@@ -1562,7 +1669,7 @@
         <div class="receipt-ref-box">
           <div class="receipt-ref-label">
             <span>🆔 Booking Reference ID</span>
-            <span class="receipt-copied-notice">✨ Auto-copied to clipboard</span>
+            <span class="receipt-copied-notice" id="receiptCopiedNotice" style="${autoCopied ? '' : 'display:none;'}">✨ Auto-copied to clipboard</span>
           </div>
           <div class="receipt-ref-value-row">
             <span class="receipt-ref-value" id="receiptRefId">${escapeHtml(b.id)}</span>
@@ -1630,7 +1737,7 @@
         <div id="receiptNotice" class="receipt-notice" style="display:none;"></div>
 
         <div class="receipt-actions">
-          <button type="button" class="btn-receipt-action view-bookings" onclick="scrollToBookings()">
+          <button type="button" class="btn-receipt-action view-bookings" onclick="scrollToBookings('${b.id}')">
             <span>📋 View in My Bookings ↓</span>
           </button>
           <button type="button" class="btn-receipt-action primary" onclick="bookAnotherAppointment()">
@@ -1662,13 +1769,21 @@
 
     // Quick Action: Book Another
     function bookAnotherAppointment() {
-      const form = document.getElementById('bookForm');
-      if (form) {
-        document.getElementById('patientName').value = '';
-        document.getElementById('patientEmail').value = '';
-        document.getElementById('patientPhone').value = '';
-        document.getElementById('reason').value = '';
-      }
+      const box = document.getElementById('confirmationBox');
+      if (box) box.style.display = 'none';
+      const legacyBody = document.getElementById('confirmationBody');
+      if (legacyBody) legacyBody.innerHTML = '';
+      currentReceiptBooking = null;
+
+      const nameEl = document.getElementById('patientName');
+      if (nameEl) nameEl.value = '';
+      const emailEl = document.getElementById('patientEmail');
+      if (emailEl) emailEl.value = '';
+      const phoneEl = document.getElementById('patientPhone');
+      if (phoneEl) phoneEl.value = '';
+      const reasonEl = document.getElementById('reason');
+      if (reasonEl) reasonEl.value = '';
+
       selectedSlotId = '';
       const slotInput = document.getElementById('slotId');
       if (slotInput) slotInput.value = '';
@@ -1676,7 +1791,7 @@
       if (copyBtn) copyBtn.style.display = 'none';
       updateSelectedSlotUI('');
 
-      currentIdempotencyKey = crypto.randomUUID();
+      currentIdempotencyKey = generateUUID();
       renderSlots();
 
       const slotsSec = document.getElementById('slotsSection');
@@ -1830,6 +1945,7 @@
                 <span class="empty-state-icon">📂</span>
                 <div class="empty-state-title">No appointments found for "${escapeHtml(email)}"</div>
                 <p class="empty-state-desc">We couldn't find any bookings matching this email address. Please double-check for typos or complete a new appointment above.</p>
+                <button type="button" class="btn-outline" onclick="clearEmailFilter()" style="margin-top:0.75rem; width:auto;">Clear Email Filter</button>
               </div>
             `;
           } else {
@@ -1853,7 +1969,7 @@
           const doc = parseDoctorInfo(b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name || b.provider || b.doctor_name);
 
           return `
-            <div class="booking-item">
+            <div class="booking-item" data-booking-id="${b.id}" id="booking-${b.id}">
               <div class="booking-info">
                 <div class="booking-header-row">
                   <span class="booking-patient-name">👤 ${escapeHtml(b.name || b.patientName || 'Patient')}</span>
