@@ -1,17 +1,22 @@
-/**
- * Deterministic JSON: object keys sorted recursively. Two request bodies that
- * differ only in key order or whitespace hash identically, so an Idempotency-Key
- * retry from a client that re-serialises its payload is not mistaken for a
- * different request.
- */
-export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    const parts = Object.keys(obj)
-      .sort()
-      .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`);
-    return `{${parts.join(',')}}`;
+import crypto from 'crypto';
+
+export function canonicalize(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
   }
-  return JSON.stringify(value) ?? 'null';
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalize).join(',')}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  const pairs = keys
+    .filter((k) => record[k] !== undefined)
+    .map((k) => `${JSON.stringify(k)}:${canonicalize(record[k])}`);
+  return `{${pairs.join(',')}}`;
+}
+
+export const canonicalJson = canonicalize;
+
+export function hashPayload(value: unknown): string {
+  return crypto.createHash('sha256').update(canonicalize(value)).digest('hex');
 }

@@ -1,60 +1,75 @@
--- Clinic booking schema. Idempotent: safe to run on every boot (see src/db.ts#migrate).
---
--- The invariants that matter are enforced HERE, not in application code:
---   * one confirmed booking per slot  -> partial unique index bookings_one_confirmed_per_slot
---   * stable pagination order         -> bookings.seq (identity) + (email, seq) index
---   * idempotent replays              -> idempotency_keys primary key
---   * per-email attempt window        -> rate_limit_hits + (email, hit_at) index
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE IF NOT EXISTS slots (
-  id        text        PRIMARY KEY,
-  provider  text        NOT NULL,
-  start_at  timestamptz NOT NULL,
-  end_at    timestamptz NOT NULL,
-  -- The client's original ISO strings, echoed back verbatim so
-  -- "2026-12-10T09:00:00Z" never comes back as "2026-12-10T09:00:00.000Z".
-  start_raw text        NOT NULL,
-  end_raw   text        NOT NULL
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    doctor_name VARCHAR(120) NOT NULL DEFAULT 'Dr. Adaobi Okafor (General Practice)',
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    is_available BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_slot_time_range CHECK (end_time > start_time),
+    CONSTRAINT uq_doctor_slot_start UNIQUE (doctor_name, start_time)
 );
 
--- GET /slots (all, and filtered by provider), always ordered by start.
-CREATE INDEX IF NOT EXISTS slots_start_idx          ON slots (start_at, id);
-CREATE INDEX IF NOT EXISTS slots_provider_start_idx ON slots (provider, start_at, id);
+CREATE INDEX IF NOT EXISTS idx_slots_availability_start
+    ON slots (is_available, start_time ASC, id ASC);
 
 CREATE TABLE IF NOT EXISTS bookings (
-  -- Monotonic insertion order. Cursor pagination keys on this, not created_at:
-  -- timestamps can tie or reorder under concurrency, a sequence cannot.
-  seq          bigint      GENERATED ALWAYS AS IDENTITY UNIQUE,
-  id           text        PRIMARY KEY,
-  slot_id      text        NOT NULL REFERENCES slots (id),
-  name         text        NOT NULL,
-  email        text        NOT NULL,          -- stored trimmed + lower-cased
-  status       text        NOT NULL CHECK (status IN ('confirmed', 'cancelled')),
-  created_at   timestamptz NOT NULL DEFAULT clock_timestamp(),
-  cancelled_at timestamptz
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slot_id UUID NOT NULL REFERENCES slots(id) ON DELETE RESTRICT,
+    patient_name VARCHAR(120) NOT NULL,
+    patient_email VARCHAR(255) NOT NULL,
+    patient_phone VARCHAR(40),
+    reason VARCHAR(500),
+    status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'
+        CHECK (status IN ('CONFIRMED', 'CANCELLED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    cancelled_at TIMESTAMPTZ
 );
 
--- THE double-booking guard. Only confirmed rows participate, so cancelling
--- (status -> 'cancelled') frees the slot with no extra bookkeeping, and any
--- number of historical cancelled rows can coexist for the same slot.
-CREATE UNIQUE INDEX IF NOT EXISTS bookings_one_confirmed_per_slot
-  ON bookings (slot_id) WHERE status = 'confirmed';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_unique_confirmed_slot
+    ON bookings (slot_id)
+    WHERE status = 'CONFIRMED';
 
--- GET /bookings?email=...&cursor=... : equality on email, range on seq.
-CREATE INDEX IF NOT EXISTS bookings_email_seq_idx ON bookings (email, seq);
+CREATE INDEX IF NOT EXISTS idx_bookings_email_created_id
+    ON bookings (LOWER(patient_email), created_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_bookings_created_id
+    ON bookings (created_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
-  key           text        PRIMARY KEY,
-  request_hash  text        NOT NULL,         -- sha256 of canonicalised request body
-  status_code   integer     NOT NULL,
-  response_body jsonb       NOT NULL,
-  created_at    timestamptz NOT NULL DEFAULT clock_timestamp()
+    client_scope VARCHAR(255) NOT NULL DEFAULT 'global',
+    idempotency_key VARCHAR(255) NOT NULL,
+    request_hash CHAR(64) NOT NULL,
+    response_status INTEGER,
+    response_body JSONB,
+    booking_id UUID REFERENCES bookings(id) ON DELETE SET NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'IN_PROGRESS'
+        CHECK (status IN ('IN_PROGRESS', 'COMPLETED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours'),
+    PRIMARY KEY (client_scope, idempotency_key)
 );
-CREATE INDEX IF NOT EXISTS idempotency_keys_created_idx ON idempotency_keys (created_at);
 
--- Sliding-window log: one row per counted attempt.
-CREATE TABLE IF NOT EXISTS rate_limit_hits (
-  email  text        NOT NULL,
-  hit_at timestamptz NOT NULL DEFAULT clock_timestamp()
-);
-CREATE INDEX IF NOT EXISTS rate_limit_hits_email_at_idx ON rate_limit_hits (email, hit_at);
+CREATE INDEX IF NOT EXISTS idx_idempotency_expires_at
+    ON idempotency_keys (expires_at);
+
+INSERT INTO slots (id, doctor_name, start_time, end_time, is_available)
+SELECT
+    gen_random_uuid(),
+    doctor,
+    slot_start,
+    slot_start + INTERVAL '30 minutes',
+    TRUE
+FROM (
+    SELECT
+        CASE
+            WHEN gs % 3 = 0 THEN 'Dr. Adaobi Okafor (General Practice)'
+            WHEN gs % 3 = 1 THEN 'Dr. Tunde Bakare (Internal Medicine)'
+            ELSE 'Dr. Amina Yusuf (Family Medicine)'
+        END AS doctor,
+        DATE_TRUNC('hour', NOW() + INTERVAL '2 hours') + (gs * INTERVAL '1 hour') AS slot_start
+    FROM generate_series(1, 24) AS gs
+) AS seed
+ON CONFLICT (doctor_name, start_time) DO NOTHING;

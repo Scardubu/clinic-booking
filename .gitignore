@@ -1,8 +1,19 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Build outputs
 dist/
-.env
-.env.*
-!.env.example
+api/dist/
 .vercel/
-*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+api/.env
+
+# Logs & OS artifacts
+npm-debug.log*
 .DS_Store
+Thumbs.db

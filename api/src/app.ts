@@ -1,89 +1,110 @@
-import Fastify, { type FastifyError, type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import express, { Request, Response, NextFunction } from 'express';
+import cors from 'cors';
 import { config } from './config.js';
-import { pool } from './db.js';
 import { safeEqual } from './util/safeEqual.js';
-import { registerBookingRoutes } from './routes/bookings.js';
-import { registerSlotRoutes } from './routes/slots.js';
-import type { Outcome } from './services/bookings.js';
+import { ApiError } from './validation.js';
+import { slotsRouter } from './routes/slots.js';
+import { bookingsRouter } from './routes/bookings.js';
 
-/** Single place that turns a service Outcome into an HTTP response. */
-export function sendOutcome(reply: FastifyReply, o: Outcome): FastifyReply {
-  if (o.headers) reply.headers(o.headers);
-  if (o.replayed) reply.header('Idempotent-Replayed', 'true');
-  return reply.code(o.status).send(o.body);
+export const app = express();
+
+app.set('trust proxy', 1);
+app.use(
+  cors({
+    origin: config.corsOrigin,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-API-Key',
+      'api-key',
+      'Idempotency-Key',
+      'X-Idempotency-Key',
+      'X-Client-Id',
+    ],
+    exposedHeaders: [
+      'X-RateLimit-Limit',
+      'X-RateLimit-Remaining',
+      'X-RateLimit-Reset',
+      'Retry-After',
+      'Idempotent-Replayed',
+    ],
+  })
+);
+
+app.use(express.json({ limit: '64kb' }));
+
+app.get(['/health', '/api/health'], (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'clinic-booking-api',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+function apiKeyAuth(req: Request, _res: Response, next: NextFunction): void {
+  const xApiKey = req.headers['x-api-key'] || req.headers['api-key'];
+  const authHeader = req.headers['authorization'];
+
+  let providedKey = '';
+  if (typeof xApiKey === 'string' && xApiKey.trim()) {
+    providedKey = xApiKey.trim();
+  } else if (typeof authHeader === 'string' && authHeader.trim()) {
+    const raw = authHeader.trim();
+    if (raw.toLowerCase().startsWith('bearer ')) {
+      providedKey = raw.slice(7).trim();
+    } else if (raw.toLowerCase().startsWith('apikey ')) {
+      providedKey = raw.slice(7).trim();
+    } else {
+      providedKey = raw;
+    }
+  }
+
+  if (!providedKey || !safeEqual(providedKey, config.apiKey)) {
+    return next(new ApiError(401, 'UNAUTHORIZED', 'Missing or invalid API key.'));
+  }
+
+  next();
 }
 
-export async function buildApp(): Promise<FastifyInstance> {
-  const app = Fastify({
-    logger: {
-      level: config.logLevel,
-      serializers: {
-        // Path only. Query strings carry patient emails (GET /bookings?email=) and
-        // must not land in log storage. Headers (X-API-Key) are never logged.
-        req: (req: FastifyRequest) => ({ method: req.method, path: req.url.split('?')[0], ip: req.ip }),
+app.use(['/slots', '/api/slots', '/v1/slots'], apiKeyAuth, slotsRouter);
+app.use(['/bookings', '/api/bookings', '/v1/bookings'], apiKeyAuth, bookingsRouter);
+
+app.use((_req, _res, next) => {
+  next(new ApiError(404, 'NOT_FOUND', 'Endpoint not found.'));
+});
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({
+      error: { code: 'INVALID_JSON', message: 'Malformed JSON request body.' },
+      code: 'INVALID_JSON',
+      message: 'Malformed JSON request body.',
+    });
+    return;
+  }
+
+  if (err instanceof ApiError) {
+    res.status(err.statusCode).json({
+      error: {
+        code: err.code,
+        message: err.message,
+        details: err.details,
       },
+      code: err.code,
+      message: err.message,
+      details: err.details,
+    });
+    return;
+  }
+
+  console.error('[INTERNAL_ERROR]', err);
+  res.status(500).json({
+    error: {
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'An unexpected internal server error occurred.',
     },
-    // Booking payloads are tiny. A small global cap blunts oversized-body abuse;
-    // /reset raises it for itself.
-    bodyLimit: 16 * 1024,
-    routerOptions: { ignoreTrailingSlash: true },
-    requestIdHeader: 'x-request-id',
-    trustProxy: true, // Render terminates TLS in front of us; req.ip is the real client
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'An unexpected internal server error occurred.',
   });
-
-  // Fastify's built-in JSON parser answers 400 to an EMPTY body when Content-Type is
-  // application/json — which many HTTP clients send on DELETE/GET. Replace it with one
-  // that treats an empty body as "no body" and reports bad JSON in our error shape.
-  app.removeContentTypeParser('application/json');
-  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
-    const text = typeof body === 'string' ? body : body.toString('utf8');
-    if (text.trim() === '') return done(null, undefined);
-    try {
-      done(null, JSON.parse(text));
-    } catch {
-      done(Object.assign(new Error('request body is not valid JSON'), { statusCode: 400 }));
-    }
-  });
-
-  // Level 2 — API key on EVERY request (the spec says every request). Runs in onRequest,
-  // i.e. before body parsing, so unauthenticated callers cannot make us buffer payloads.
-  // Health probes and CORS preflights are the only exemptions.
-  app.addHook('onRequest', async (req, reply) => {
-    if (req.method === 'OPTIONS') return;
-    const path = req.url.split('?')[0]!.replace(/\/+$/, '');
-    if (path === '/health' || path === '/ready') return;
-    const key = req.headers['x-api-key'];
-    if (typeof key !== 'string' || !safeEqual(key, config.apiKey)) {
-      return reply.code(401).send({ error: 'missing or invalid API key' });
-    }
-  });
-
-  // Every error — ours, Fastify's, the body parser's — leaves as {"error": "..."}.
-  app.setErrorHandler((err: FastifyError, req, reply) => {
-    const status = typeof err.statusCode === 'number' && err.statusCode >= 400 ? err.statusCode : 500;
-    if (status >= 500) {
-      req.log.error({ err }, 'unhandled error');
-      return reply.code(500).send({ error: 'internal server error' });
-    }
-    const message =
-      status === 413 ? 'request body too large' : status === 415 ? 'content-type must be application/json' : err.message;
-    return reply.code(status).send({ error: message });
-  });
-  app.setNotFoundHandler((_req, reply) => reply.code(404).send({ error: 'not found' }));
-
-  // Liveness never touches the database: an uptime pinger hitting it must not keep a
-  // scale-to-zero Postgres compute awake. Readiness does.
-  app.get('/health', async () => ({ status: 'ok' }));
-  app.get('/ready', async (_req, reply) => {
-    try {
-      await pool.query('SELECT 1');
-      return { status: 'ready' };
-    } catch {
-      return reply.code(503).send({ error: 'database unavailable' });
-    }
-  });
-
-  await app.register(registerSlotRoutes);
-  await app.register(registerBookingRoutes);
-  return app;
-}
+});

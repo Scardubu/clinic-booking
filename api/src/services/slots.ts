@@ -1,65 +1,66 @@
-import { pool, withTx } from '../db.js';
-import type { NewSlot } from '../validation.js';
+import { pool } from '../db.js';
+import { ApiError, isValidUuid } from '../validation.js';
 
-interface SlotRow {
+export interface SlotDTO {
   id: string;
-  provider: string;
-  start_raw: string;
-  end_raw: string;
+  doctorName: string;
+  doctor_name: string;
+  startTime: string;
+  start_time: string;
+  endTime: string;
+  end_time: string;
   available: boolean;
+  isAvailable: boolean;
+  is_available: boolean;
+  status: 'AVAILABLE' | 'BOOKED';
 }
 
-export async function listSlots(provider: string | undefined) {
-  const { rows } = await pool.query<SlotRow>(
-    `SELECT s.id, s.provider, s.start_raw, s.end_raw,
-            NOT EXISTS (SELECT 1 FROM bookings b WHERE b.slot_id = s.id AND b.status = 'confirmed') AS available
-       FROM slots s
-      WHERE ($1::text IS NULL OR s.provider = $1)
-      ORDER BY s.start_at ASC, s.id ASC`,
-    [provider ?? null],
-  );
+export function mapSlotRow(row: any): SlotDTO {
+  const startIso = new Date(row.start_time).toISOString();
+  const endIso = new Date(row.end_time).toISOString();
+  const isAvailable = Boolean(row.is_available);
+
   return {
-    slots: rows.map((r) => ({
-      id: r.id,
-      provider: r.provider,
-      start: r.start_raw,
-      end: r.end_raw,
-      available: r.available,
-    })),
+    id: row.id,
+    doctorName: row.doctor_name,
+    doctor_name: row.doctor_name,
+    startTime: startIso,
+    start_time: startIso,
+    endTime: endIso,
+    end_time: endIso,
+    available: isAvailable,
+    isAvailable,
+    is_available: isAvailable,
+    status: isAvailable ? 'AVAILABLE' : 'BOOKED',
   };
 }
 
-/**
- * POST /reset — atomically wipe everything and install the given slots.
- * Also clears idempotency keys and rate-limit history: a "reset" that left either
- * behind would make test runs leak into each other (the same email would still be
- * rate-limited, an old Idempotency-Key would replay a booking that no longer exists).
- * TRUNCATE takes ACCESS EXCLUSIVE locks, so it waits for in-flight bookings to
- * finish instead of racing them.
- */
-export async function resetSlots(slots: NewSlot[]): Promise<number> {
-  return withTx(async (client) => {
-    await client.query('TRUNCATE bookings, slots, idempotency_keys, rate_limit_hits RESTART IDENTITY');
-    if (slots.length > 0) {
-      await client.query(
-        `INSERT INTO slots (id, provider, start_at, end_at, start_raw, end_raw)
-         SELECT * FROM unnest($1::text[], $2::text[], $3::timestamptz[], $4::timestamptz[], $5::text[], $6::text[])`,
-        [
-          slots.map((s) => s.id),
-          slots.map((s) => s.provider),
-          slots.map((s) => s.startAt),
-          slots.map((s) => s.endAt),
-          slots.map((s) => s.startRaw),
-          slots.map((s) => s.endRaw),
-        ],
-      );
-    }
-    return slots.length;
-  });
+export async function listSlots(onlyAvailable = true): Promise<SlotDTO[]> {
+  const sql = onlyAvailable
+    ? `SELECT id, doctor_name, start_time, end_time, is_available
+       FROM slots
+       WHERE is_available = TRUE
+       ORDER BY start_time ASC, id ASC`
+    : `SELECT id, doctor_name, start_time, end_time, is_available
+       FROM slots
+       ORDER BY start_time ASC, id ASC`;
+
+  const { rows } = await pool.query(sql);
+  return rows.map(mapSlotRow);
 }
 
-/** Opportunistic housekeeping. Correctness never depends on this running. */
-export async function purgeStale(): Promise<void> {
-  await pool.query(`DELETE FROM rate_limit_hits WHERE hit_at < clock_timestamp() - interval '10 minutes'`);
-  await pool.query(`DELETE FROM idempotency_keys WHERE created_at < clock_timestamp() - interval '24 hours'`);
+export async function getSlotById(slotId: string): Promise<SlotDTO> {
+  if (!isValidUuid(slotId)) {
+    throw new ApiError(400, 'INVALID_SLOT_ID', 'Slot ID must be a valid UUID.');
+  }
+  const { rows, rowCount } = await pool.query(
+    `SELECT id, doctor_name, start_time, end_time, is_available
+     FROM slots
+     WHERE id = $1`,
+    [slotId]
+  );
+  if (!rowCount || !rows[0]) {
+    throw new ApiError(404, 'SLOT_NOT_FOUND', 'Slot not found.');
+  }
+  return mapSlotRow(rows[0]);
 }

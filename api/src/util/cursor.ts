@@ -1,11 +1,27 @@
-/** Opaque cursor = base64url of the last-seen bookings.seq. */
-export function encodeCursor(seq: string): string {
-  return Buffer.from(seq, 'utf8').toString('base64url');
+export interface BookingCursor {
+  createdAt: string;
+  id: string;
 }
 
-/** Returns the seq as a digit string (bigint-safe), or null if the cursor is not one we issued. */
-export function decodeCursor(cursor: string): string | null {
-  if (!/^[A-Za-z0-9_-]{1,40}$/.test(cursor)) return null;
-  const decoded = Buffer.from(cursor, 'base64url').toString('utf8');
-  return /^[0-9]{1,18}$/.test(decoded) ? decoded : null;
+export function encodeCursor(cursor: BookingCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+export function decodeCursor(token: string): BookingCursor | null {
+  try {
+    const json = Buffer.from(token, 'base64url').toString('utf8');
+    const parsed = JSON.parse(json);
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      typeof parsed.createdAt === 'string' &&
+      typeof parsed.id === 'string' &&
+      !Number.isNaN(Date.parse(parsed.createdAt))
+    ) {
+      return { createdAt: parsed.createdAt, id: parsed.id };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }

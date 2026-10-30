@@ -1,192 +1,379 @@
-import { createHash, randomUUID } from 'node:crypto';
-import type { PoolClient } from 'pg';
-import { advisoryXactLock, pool, withTx } from '../db.js';
-import { canonicalJson } from '../util/canonical.js';
+import { pool, withTransaction } from '../db.js';
+import { ApiError, CreateBookingInput, isValidUuid } from '../validation.js';
+import { hashPayload } from '../util/canonical.js';
 import { decodeCursor, encodeCursor } from '../util/cursor.js';
-import { consumeAttempt } from './rateLimit.js';
-import { parseNewBooking, rateLimitKey } from '../validation.js';
 
-export interface Outcome {
-  status: number;
-  body: unknown;
-  headers?: Record<string, string>;
-  replayed?: boolean;
-}
-
-interface BookingRow {
-  seq: string;
+export interface BookingDTO {
   id: string;
+  slotId: string;
   slot_id: string;
-  name: string;
-  email: string;
-  status: 'confirmed' | 'cancelled';
-  created_at: Date;
+  patientName: string;
+  patient_name: string;
+  patientEmail: string;
+  patient_email: string;
+  patientPhone: string | null;
+  patient_phone: string | null;
+  reason: string | null;
+  status: 'CONFIRMED' | 'CANCELLED';
+  createdAt: string;
+  created_at: string;
+  cancelledAt: string | null;
+  cancelled_at: string | null;
+  slot?: {
+    id: string;
+    doctorName: string;
+    doctor_name: string;
+    startTime: string;
+    start_time: string;
+    endTime: string;
+    end_time: string;
+  };
 }
 
-const BOOKING_COLS = 'seq, id, slot_id, name, email, status, created_at';
+function mapBookingRow(row: any): BookingDTO {
+  const createdIso = new Date(row.created_at).toISOString();
+  const cancelledIso = row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null;
 
-const toBooking = (r: BookingRow) => ({
-  id: r.id,
-  slot_id: r.slot_id,
-  name: r.name,
-  email: r.email,
-  status: r.status,
-  created_at: r.created_at.toISOString(),
-});
+  const dto: BookingDTO = {
+    id: row.id,
+    slotId: row.slot_id,
+    slot_id: row.slot_id,
+    patientName: row.patient_name,
+    patient_name: row.patient_name,
+    patientEmail: row.patient_email,
+    patient_email: row.patient_email,
+    patientPhone: row.patient_phone ?? null,
+    patient_phone: row.patient_phone ?? null,
+    reason: row.reason ?? null,
+    status: row.status,
+    createdAt: createdIso,
+    created_at: createdIso,
+    cancelledAt: cancelledIso,
+    cancelled_at: cancelledIso,
+  };
 
-const fail = (status: number, error: string): Outcome => ({ status, body: { error } });
+  if (row.start_time && row.end_time) {
+    const startIso = new Date(row.start_time).toISOString();
+    const endIso = new Date(row.end_time).toISOString();
+    dto.slot = {
+      id: row.slot_id,
+      doctorName: row.doctor_name,
+      doctor_name: row.doctor_name,
+      startTime: startIso,
+      start_time: startIso,
+      endTime: endIso,
+      end_time: endIso,
+    };
+  }
 
-/**
- * POST /bookings — levels 1-5 in ONE transaction:
- *
- *   1. idempotency lookup   (replay / 422)           lock order: idem key ...
- *   2. rate-limit accounting (429)                   ... then email. Fixed order => no deadlocks.
- *   3. validate -> slot exists -> slot not started -> insert (409 on conflict)
- *   4. record the response against the idempotency key
- *
- * Order matters for the contract:
- *   - Replays are NOT new attempts: they short-circuit before the limiter, so a client
- *     retrying a timed-out request is never punished with a 429 for retrying.
- *   - The limiter runs BEFORE validation so that failed attempts count ("failed
- *     attempts included"), but AFTER the replay check.
- *   - 429 responses are never stored under the idempotency key: it is a transient
- *     condition, and the same key must be usable again once the window clears.
- */
-export function createBooking(rawBody: unknown, idempotencyKey: string | null): Promise<Outcome> {
-  return withTx(async (client) => {
-    let requestHash: string | null = null;
+  return dto;
+}
 
-    if (idempotencyKey !== null) {
-      requestHash = createHash('sha256').update(canonicalJson(rawBody)).digest('hex');
+export async function createBooking(
+  input: CreateBookingInput,
+  idempotencyKey?: string,
+  clientScope = 'global'
+): Promise<{ statusCode: number; body: any; replayed: boolean }> {
+  const cleanIdemKey = idempotencyKey?.trim();
+  const requestHash = hashPayload(input);
 
-      // Serialise same-key requests: the second waits here until the first commits,
-      // then finds the stored response below. This is what makes a concurrent
-      // retry storm collapse to exactly one booking.
-      await advisoryXactLock(client, `idem:${idempotencyKey}`);
-      const prior = await client.query<{ request_hash: string; status_code: number; response_body: unknown }>(
-        'SELECT request_hash, status_code, response_body FROM idempotency_keys WHERE key = $1',
-        [idempotencyKey],
+  return withTransaction(async (client) => {
+    if (cleanIdemKey) {
+      if (cleanIdemKey.length > 255) {
+        throw new ApiError(
+          400,
+          'INVALID_IDEMPOTENCY_KEY',
+          'Idempotency-Key must not exceed 255 characters.'
+        );
+      }
+
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
+        `${clientScope}:${cleanIdemKey}`,
+      ]);
+
+      const idemRes = await client.query(
+        `SELECT request_hash, response_status, response_body, status
+         FROM idempotency_keys
+         WHERE client_scope = $1 AND idempotency_key = $2 AND expires_at > NOW()
+         FOR UPDATE`,
+        [clientScope, cleanIdemKey]
       );
-      const hit = prior.rows[0];
-      if (hit) {
-        if (hit.request_hash !== requestHash) {
-          return fail(422, 'Idempotency-Key was already used with a different request body');
+
+      if (idemRes.rowCount && idemRes.rows[0]) {
+        const existing = idemRes.rows[0];
+        if (existing.request_hash !== requestHash) {
+          throw new ApiError(
+            409,
+            'IDEMPOTENCY_KEY_CONFLICT',
+            'Idempotency-Key was already used with a different request payload.'
+          );
         }
-        return { status: hit.status_code, body: hit.response_body, replayed: true };
+        if (existing.status === 'COMPLETED' && existing.response_body) {
+          return {
+            statusCode: existing.response_status || 201,
+            body: existing.response_body,
+            replayed: true,
+          };
+        }
+      } else {
+        await client.query(
+          `INSERT INTO idempotency_keys (client_scope, idempotency_key, request_hash, status)
+           VALUES ($1, $2, $3, 'IN_PROGRESS')
+           ON CONFLICT (client_scope, idempotency_key) DO UPDATE
+           SET request_hash = EXCLUDED.request_hash,
+               status = 'IN_PROGRESS',
+               expires_at = NOW() + INTERVAL '24 hours'`,
+          [clientScope, cleanIdemKey, requestHash]
+        );
       }
     }
 
-    const limiterKey = rateLimitKey(rawBody);
-    if (limiterKey !== null) {
-      const verdict = await consumeAttempt(client, limiterKey);
-      if (!verdict.allowed) {
-        return {
-          status: 429,
-          body: { error: 'too many booking attempts for this email, try again later' },
-          headers: { 'Retry-After': String(verdict.retryAfterSeconds) },
-        };
-      }
+    const slotRes = await client.query(
+      `SELECT id, doctor_name, start_time, end_time, is_available
+       FROM slots
+       WHERE id = $1
+       FOR UPDATE`,
+      [input.slotId]
+    );
+
+    if (!slotRes.rowCount || !slotRes.rows[0]) {
+      throw new ApiError(404, 'SLOT_NOT_FOUND', 'The requested appointment slot does not exist.');
     }
 
-    const outcome = await attemptBooking(client, rawBody);
-
-    if (idempotencyKey !== null) {
-      await client.query(
-        `INSERT INTO idempotency_keys (key, request_hash, status_code, response_body)
-         VALUES ($1, $2, $3, $4::jsonb)
-         ON CONFLICT (key) DO NOTHING`,
-        [idempotencyKey, requestHash, outcome.status, JSON.stringify(outcome.body)],
+    const slot = slotRes.rows[0];
+    if (!slot.is_available) {
+      throw new ApiError(
+        409,
+        'SLOT_ALREADY_BOOKED',
+        'This appointment slot has already been booked.'
       );
     }
-    return outcome;
+
+    let insertedBooking: any;
+    try {
+      const insertRes = await client.query(
+        `INSERT INTO bookings (slot_id, patient_name, patient_email, patient_phone, reason, status)
+         VALUES ($1, $2, $3, $4, $5, 'CONFIRMED')
+         RETURNING *`,
+        [
+          input.slotId,
+          input.patientName,
+          input.patientEmail,
+          input.patientPhone ?? null,
+          input.reason ?? null,
+        ]
+      );
+      insertedBooking = insertRes.rows[0];
+    } catch (err: any) {
+      if (err?.code === '23505') {
+        throw new ApiError(
+          409,
+          'SLOT_ALREADY_BOOKED',
+          'This appointment slot has already been booked.'
+        );
+      }
+      throw err;
+    }
+
+    await client.query(
+      `UPDATE slots SET is_available = FALSE, updated_at = NOW() WHERE id = $1`,
+      [input.slotId]
+    );
+
+    const dto = mapBookingRow({
+      ...insertedBooking,
+      doctor_name: slot.doctor_name,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+    });
+
+    const responseBody = {
+      booking: dto,
+      ...dto,
+    };
+
+    if (cleanIdemKey) {
+      await client.query(
+        `UPDATE idempotency_keys
+         SET status = 'COMPLETED',
+             response_status = 201,
+             response_body = $3::jsonb,
+             booking_id = $4
+         WHERE client_scope = $1 AND idempotency_key = $2`,
+        [clientScope, cleanIdemKey, JSON.stringify(responseBody), dto.id]
+      );
+    }
+
+    return {
+      statusCode: 201,
+      body: responseBody,
+      replayed: false,
+    };
   });
 }
 
-async function attemptBooking(client: PoolClient, rawBody: unknown): Promise<Outcome> {
-  const parsed = parseNewBooking(rawBody);
-  if (!parsed.ok) return fail(400, parsed.error);
-  const { slotId, name, email } = parsed.value;
-
-  const slot = await client.query<{ started: boolean }>(
-    'SELECT start_at <= clock_timestamp() AS started FROM slots WHERE id = $1',
-    [slotId],
-  );
-  const found = slot.rows[0];
-  if (!found) return fail(404, 'slot not found');
-  if (found.started) return fail(400, 'slot has already started');
-
-  // The race-proof part. The partial unique index means two concurrent inserts for
-  // the same slot cannot both succeed: the loser blocks on the index entry until the
-  // winner commits, then hits the conflict and gets zero rows back. No error is
-  // raised, so the surrounding transaction (and its rate-limit hit) stays valid.
-  const inserted = await client.query<BookingRow>(
-    `INSERT INTO bookings (id, slot_id, name, email, status)
-     VALUES ($1, $2, $3, $4, 'confirmed')
-     ON CONFLICT (slot_id) WHERE status = 'confirmed' DO NOTHING
-     RETURNING ${BOOKING_COLS}`,
-    [randomUUID(), slotId, name, email],
-  );
-  const row = inserted.rows[0];
-  if (!row) return fail(409, 'slot is already booked');
-  return { status: 201, body: toBooking(row) };
-}
-
-export async function getBooking(id: string): Promise<Outcome> {
-  const { rows } = await pool.query<BookingRow>(`SELECT ${BOOKING_COLS} FROM bookings WHERE id = $1`, [id]);
-  const row = rows[0];
-  return row ? { status: 200, body: toBooking(row) } : fail(404, 'booking not found');
-}
-
-/**
- * DELETE /bookings/:id. One conditional UPDATE is the whole race-safe story: of two
- * concurrent cancels exactly one matches `status = 'confirmed'`; the other updates
- * nothing and is told 409. Flipping the status also frees the slot, because the
- * unique index only covers confirmed rows.
- */
-export async function cancelBooking(id: string): Promise<Outcome> {
-  const updated = await pool.query<BookingRow>(
-    `UPDATE bookings SET status = 'cancelled', cancelled_at = clock_timestamp()
-      WHERE id = $1 AND status = 'confirmed'
-      RETURNING ${BOOKING_COLS}`,
-    [id],
-  );
-  const row = updated.rows[0];
-  if (row) return { status: 200, body: toBooking(row) };
-
-  const exists = await pool.query('SELECT 1 FROM bookings WHERE id = $1', [id]);
-  return exists.rowCount ? fail(409, 'booking is already cancelled') : fail(404, 'booking not found');
-}
-
-/**
- * GET /bookings?email=&limit=&cursor= — keyset pagination, oldest first.
- * Fetches limit+1 rows: if the extra row exists there IS a next page, so the final
- * page reports next_cursor:null even when it is exactly `limit` long (no phantom
- * empty trailing page).
- */
-export async function listBookings(email: string, limit: number, cursor: string | null): Promise<Outcome> {
-  let after: string | null = null;
-  if (cursor !== null) {
-    after = decodeCursor(cursor);
-    if (after === null) return fail(400, 'cursor is not valid');
+export async function getBookingById(bookingId: string): Promise<BookingDTO> {
+  if (!isValidUuid(bookingId)) {
+    throw new ApiError(400, 'INVALID_BOOKING_ID', 'Booking ID must be a valid UUID.');
   }
 
-  const { rows } = await pool.query<BookingRow>(
-    `SELECT ${BOOKING_COLS}
-       FROM bookings
-      WHERE email = $1 AND ($2::bigint IS NULL OR seq > $2::bigint)
-      ORDER BY seq ASC
-      LIMIT $3`,
-    [email, after, limit + 1],
+  const { rows, rowCount } = await pool.query(
+    `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+     FROM bookings b
+     JOIN slots s ON s.id = b.slot_id
+     WHERE b.id = $1`,
+    [bookingId]
+  );
+
+  if (!rowCount || !rows[0]) {
+    throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+  }
+
+  return mapBookingRow(rows[0]);
+}
+
+export async function cancelBooking(bookingId: string): Promise<BookingDTO> {
+  if (!isValidUuid(bookingId)) {
+    throw new ApiError(400, 'INVALID_BOOKING_ID', 'Booking ID must be a valid UUID.');
+  }
+
+  return withTransaction(async (client) => {
+    const existingRes = await client.query(
+      `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+       FROM bookings b
+       JOIN slots s ON s.id = b.slot_id
+       WHERE b.id = $1
+       FOR UPDATE OF b, s`,
+      [bookingId]
+    );
+
+    if (!existingRes.rowCount || !existingRes.rows[0]) {
+      throw new ApiError(404, 'BOOKING_NOT_FOUND', 'Booking not found.');
+    }
+
+    const booking = existingRes.rows[0];
+    if (booking.status === 'CANCELLED') {
+      throw new ApiError(409, 'BOOKING_ALREADY_CANCELLED', 'Booking is already cancelled.');
+    }
+
+    const updatedRes = await client.query(
+      `UPDATE bookings
+       SET status = 'CANCELLED', cancelled_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [bookingId]
+    );
+
+    await client.query(
+      `UPDATE slots
+       SET is_available = TRUE, updated_at = NOW()
+       WHERE id = $1`,
+      [booking.slot_id]
+    );
+
+    return mapBookingRow({
+      ...updatedRes.rows[0],
+      doctor_name: booking.doctor_name,
+      start_time: booking.start_time,
+      end_time: booking.end_time,
+    });
+  });
+}
+
+export interface ListBookingsQuery {
+  patientEmail?: string;
+  status?: string;
+  limit?: number;
+  page?: number;
+  offset?: number;
+  cursor?: string;
+}
+
+export async function listBookingsPaginated(params: ListBookingsQuery) {
+  const limit = Math.min(50, Math.max(1, Number(params.limit) || 10));
+  const values: any[] = [];
+  const filters: string[] = [];
+
+  if (params.patientEmail) {
+    values.push(params.patientEmail.trim().toLowerCase());
+    filters.push(`LOWER(b.patient_email) = $${values.length}`);
+  }
+
+  if (params.status && ['CONFIRMED', 'CANCELLED'].includes(params.status.toUpperCase())) {
+    values.push(params.status.toUpperCase());
+    filters.push(`b.status = $${values.length}`);
+  }
+
+  const baseWhere = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+  const countRes = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM bookings b ${baseWhere}`,
+    values
+  );
+  const total = countRes.rows[0]?.total ?? 0;
+
+  if (params.cursor) {
+    const decoded = decodeCursor(params.cursor);
+    if (!decoded) {
+      throw new ApiError(400, 'INVALID_CURSOR', 'Invalid pagination cursor.');
+    }
+    values.push(decoded.createdAt, decoded.id);
+    filters.push(
+      `(b.created_at, b.id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`
+    );
+  }
+
+  const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+  const page = Math.max(1, Number(params.page) || 1);
+  const offset =
+    params.offset !== undefined ? Math.max(0, Number(params.offset)) : (page - 1) * limit;
+
+  let offsetSql = '';
+  if (!params.cursor && offset > 0) {
+    values.push(offset);
+    offsetSql = `OFFSET $${values.length}`;
+  }
+
+  values.push(limit + 1);
+  const limitIdx = values.length;
+
+  const { rows } = await pool.query(
+    `SELECT b.*, s.doctor_name, s.start_time, s.end_time
+     FROM bookings b
+     JOIN slots s ON s.id = b.slot_id
+     ${whereClause}
+     ORDER BY b.created_at DESC, b.id DESC
+     LIMIT $${limitIdx}
+     ${offsetSql}`,
+    values
   );
 
   const hasMore = rows.length > limit;
-  const page = hasMore ? rows.slice(0, limit) : rows;
-  const last = page[page.length - 1];
+  const sliced = hasMore ? rows.slice(0, limit) : rows;
+  const bookings = sliced.map(mapBookingRow);
+  const last = bookings[bookings.length - 1];
+  const nextCursor =
+    hasMore && last ? encodeCursor({ createdAt: last.createdAt, id: last.id }) : null;
+
   return {
-    status: 200,
-    body: {
-      bookings: page.map(toBooking),
-      next_cursor: hasMore && last ? encodeCursor(last.seq) : null,
+    bookings,
+    data: bookings,
+    items: bookings,
+    pagination: {
+      total,
+      limit,
+      page,
+      offset: params.cursor ? undefined : offset,
+      hasMore,
+      has_more: hasMore,
+      nextCursor,
+      next_cursor: nextCursor,
     },
+    total,
+    limit,
+    page,
+    hasMore,
+    has_more: hasMore,
+    nextCursor,
+    next_cursor: nextCursor,
   };
 }

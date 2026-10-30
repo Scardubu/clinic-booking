@@ -1,19 +1,24 @@
-# Render Blueprint. Dashboard > New > Blueprint > pick this repo.
-# (Or create the web service by hand with the same values.)
 services:
   - type: web
     name: clinic-booking-api
     runtime: node
     rootDir: api
     plan: free
-    region: frankfurt          # keep in the same region as your Neon project
-    buildCommand: npm ci --include=dev && npm run build
-    startCommand: node dist/server.js
-    healthCheckPath: /health   # liveness only; does not touch the database
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: API_KEY
-        sync: false            # you paste this in the dashboard
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
       - key: DATABASE_URL
         sync: false
+      - key: API_KEY
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: RATE_LIMIT_WINDOW_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "10"

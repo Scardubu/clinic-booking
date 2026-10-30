@@ -1,112 +1,95 @@
-// Pragmatic email check: one @, no whitespace, a dot in the domain. Deliverability
-// is not something regexes can prove; this rejects the junk the spec cares about.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MAX_NAME = 200;
-const MAX_EMAIL = 254;
-const MAX_SLOT_ID = 200;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_REGEX = /^\+?[0-9\s\-().]{7,25}$/;
 
-export const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
-
-export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
-
-export interface NewBooking {
+export interface CreateBookingInput {
   slotId: string;
-  name: string;
-  email: string;
+  patientName: string;
+  patientEmail: string;
+  patientPhone?: string;
+  reason?: string;
 }
 
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return v !== null && typeof v === 'object' && !Array.isArray(v);
+export class ApiError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly details?: string[];
+
+  constructor(statusCode: number, code: string, message: string, details?: string[]) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
 }
 
-/**
- * Level 2 field validation. Returns the FIRST problem so the client gets one
- * clear message. Name and email are trimmed; email is lower-cased.
- */
-export function parseNewBooking(body: unknown): Result<NewBooking> {
-  if (!isRecord(body)) return { ok: false, error: 'request body must be a JSON object' };
+export function isValidUuid(value: unknown): value is string {
+  return typeof value === 'string' && UUID_REGEX.test(value.trim());
+}
 
-  const { slot_id, name, email } = body;
-
-  if (typeof slot_id !== 'string' || slot_id.trim() === '') {
-    return { ok: false, error: 'slot_id is required' };
-  }
-  if (slot_id.length > MAX_SLOT_ID) return { ok: false, error: 'slot_id is too long' };
-
-  if (typeof name !== 'string' || name.trim() === '') {
-    return { ok: false, error: 'name is required' };
-  }
-  const cleanName = name.trim();
-  if (cleanName.length > MAX_NAME) return { ok: false, error: `name must be at most ${MAX_NAME} characters` };
-
-  if (typeof email !== 'string' || email.trim() === '') {
-    return { ok: false, error: 'email is required' };
-  }
-  const cleanEmail = normalizeEmail(email);
-  if (cleanEmail.length > MAX_EMAIL || !EMAIL_RE.test(cleanEmail)) {
-    return { ok: false, error: 'email is not valid' };
+export function validateCreateBooking(body: unknown): CreateBookingInput {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new ApiError(400, 'INVALID_PAYLOAD', 'Request body must be a valid JSON object.');
   }
 
-  return { ok: true, value: { slotId: slot_id, name: cleanName, email: cleanEmail } };
-}
+  const raw = body as Record<string, unknown>;
+  const patientObj =
+    raw.patient && typeof raw.patient === 'object' && !Array.isArray(raw.patient)
+      ? (raw.patient as Record<string, unknown>)
+      : {};
 
-/**
- * Level 5 limiter key. Derived from the RAW body *before* validation so that
- * failed attempts (bad payloads, unknown slots, conflicts) are counted too.
- * No usable email string => no key => nothing to attribute the attempt to.
- */
-export function rateLimitKey(body: unknown): string | null {
-  if (!isRecord(body) || typeof body.email !== 'string') return null;
-  const key = normalizeEmail(body.email);
-  return key === '' ? null : key;
-}
+  const slotId = String(raw.slotId ?? raw.slot_id ?? '').trim();
+  const patientName = String(
+    raw.patientName ?? raw.patient_name ?? raw.name ?? patientObj.name ?? ''
+  ).trim();
+  const patientEmail = String(
+    raw.patientEmail ?? raw.patient_email ?? raw.email ?? patientObj.email ?? ''
+  )
+    .trim()
+    .toLowerCase();
 
-export interface NewSlot {
-  id: string;
-  provider: string;
-  startAt: string; // normalised ISO, for the timestamptz column
-  endAt: string;
-  startRaw: string; // as sent, echoed back verbatim
-  endRaw: string;
-}
+  const rawPhone = raw.patientPhone ?? raw.patient_phone ?? raw.phone ?? patientObj.phone;
+  const rawReason = raw.reason ?? raw.notes ?? raw.description;
 
-const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/i;
+  const errors: string[] = [];
 
-function parseInstant(v: unknown): { raw: string; iso: string } | null {
-  if (typeof v !== 'string' || !ISO_RE.test(v)) return null;
-  // No offset => treat as UTC rather than server-local time.
-  const hasOffset = /(Z|[+-]\d{2}:\d{2})$/i.test(v);
-  const ms = Date.parse(hasOffset ? v : `${v}Z`);
-  return Number.isNaN(ms) ? null : { raw: v, iso: new Date(ms).toISOString() };
-}
-
-/** POST /reset body. */
-export function parseSlots(body: unknown): Result<NewSlot[]> {
-  if (!isRecord(body) || !Array.isArray(body.slots)) {
-    return { ok: false, error: 'body must be {"slots": [...]}' };
+  if (!slotId) {
+    errors.push('slotId is required.');
+  } else if (!isValidUuid(slotId)) {
+    errors.push('slotId must be a valid UUID.');
   }
-  const seen = new Set<string>();
-  const out: NewSlot[] = [];
-  for (const [i, s] of body.slots.entries()) {
-    if (!isRecord(s)) return { ok: false, error: `slots[${i}] must be an object` };
-    if (typeof s.id !== 'string' || s.id === '') return { ok: false, error: `slots[${i}].id is required` };
-    if (typeof s.provider !== 'string' || s.provider === '') {
-      return { ok: false, error: `slots[${i}].provider is required` };
+
+  if (!patientName) {
+    errors.push('patientName is required.');
+  } else if (patientName.length < 2 || patientName.length > 120) {
+    errors.push('patientName must be between 2 and 120 characters.');
+  }
+
+  if (!patientEmail) {
+    errors.push('patientEmail is required.');
+  } else if (!EMAIL_REGEX.test(patientEmail) || patientEmail.length > 255) {
+    errors.push('patientEmail must be a valid email address.');
+  }
+
+  let patientPhone: string | undefined;
+  if (rawPhone !== undefined && rawPhone !== null && String(rawPhone).trim() !== '') {
+    patientPhone = String(rawPhone).trim();
+    if (!PHONE_REGEX.test(patientPhone)) {
+      errors.push('patientPhone must be a valid phone number.');
     }
-    const start = parseInstant(s.start);
-    const end = parseInstant(s.end);
-    if (!start) return { ok: false, error: `slots[${i}].start must be an ISO 8601 date-time` };
-    if (!end) return { ok: false, error: `slots[${i}].end must be an ISO 8601 date-time` };
-    if (seen.has(s.id)) return { ok: false, error: `duplicate slot id "${s.id}"` };
-    seen.add(s.id);
-    out.push({
-      id: s.id,
-      provider: s.provider,
-      startAt: start.iso,
-      endAt: end.iso,
-      startRaw: start.raw,
-      endRaw: end.raw,
-    });
   }
-  return { ok: true, value: out };
+
+  let reason: string | undefined;
+  if (rawReason !== undefined && rawReason !== null && String(rawReason).trim() !== '') {
+    reason = String(rawReason).trim();
+    if (reason.length > 500) {
+      errors.push('reason must not exceed 500 characters.');
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new ApiError(400, 'VALIDATION_ERROR', errors[0], errors);
+  }
+
+  return { slotId, patientName, patientEmail, patientPhone, reason };
 }

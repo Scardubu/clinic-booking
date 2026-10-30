@@ -1,43 +1,85 @@
-import type { PoolClient } from 'pg';
-import { advisoryXactLock } from '../db.js';
+import { Request, Response, NextFunction } from 'express';
 import { config } from '../config.js';
+import { ApiError } from '../validation.js';
 
-export type Verdict = { allowed: true } | { allowed: false; retryAfterSeconds: number };
+interface SlidingBucket {
+  timestamps: number[];
+}
 
-/**
- * Sliding-window-log limiter, backed by Postgres.
- *
- * Why Postgres and not memory/Redis:
- *   - survives restarts and works across instances with no extra infra to host,
- *   - runs INSIDE the booking transaction, so "count the attempt" and "do the
- *     work" are one atomic unit and the 6th concurrent request cannot slip past.
- *
- * Concurrency: a per-email advisory lock serialises same-email requests. Different
- * emails never contend. The lock is held until COMMIT, so attempt N+1 sees attempt N.
- *
- * clock_timestamp() (not now()): now() is frozen at transaction start, which is
- * BEFORE we waited on the lock — using it would shrink the window under contention.
- *
- * Blocked (429) attempts are not logged, so Retry-After is exact: it is the time
- * until the oldest counted attempt leaves the window, after which one request fits.
- */
-export async function consumeAttempt(client: PoolClient, email: string): Promise<Verdict> {
-  const { max, windowSeconds } = config.rateLimit;
-  await advisoryXactLock(client, `rl:${email}`);
+const memoryBuckets = new Map<string, SlidingBucket>();
 
-  const { rows } = await client.query<{ n: number; retry_after: number | null }>(
-    `SELECT count(*)::int AS n,
-            CEIL(EXTRACT(EPOCH FROM (min(hit_at) + make_interval(secs => $2) - clock_timestamp())))::int AS retry_after
-       FROM rate_limit_hits
-      WHERE email = $1
-        AND hit_at > clock_timestamp() - make_interval(secs => $2)`,
-    [email, windowSeconds],
-  );
-  const row = rows[0]!;
+export function evaluateSlidingWindow(
+  bucketKey: string,
+  windowMs = config.rateLimitWindowMs,
+  maxRequests = config.rateLimitMaxRequests
+): {
+  allowed: boolean;
+  remaining: number;
+  retryAfterSeconds: number;
+  resetAtEpochSeconds: number;
+} {
+  const now = Date.now();
+  const windowStart = now - windowMs;
 
-  if (row.n >= max) {
-    return { allowed: false, retryAfterSeconds: Math.max(1, row.retry_after ?? windowSeconds) };
+  let bucket = memoryBuckets.get(bucketKey);
+  if (!bucket) {
+    bucket = { timestamps: [] };
+    memoryBuckets.set(bucketKey, bucket);
   }
-  await client.query('INSERT INTO rate_limit_hits (email) VALUES ($1)', [email]);
-  return { allowed: true };
+
+  bucket.timestamps = bucket.timestamps.filter((ts) => ts > windowStart);
+
+  if (bucket.timestamps.length >= maxRequests) {
+    const oldest = bucket.timestamps[0];
+    const retryAfterMs = Math.max(1000, oldest + windowMs - now);
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: Math.ceil(retryAfterMs / 1000),
+      resetAtEpochSeconds: Math.ceil((oldest + windowMs) / 1000),
+    };
+  }
+
+  bucket.timestamps.push(now);
+  return {
+    allowed: true,
+    remaining: Math.max(0, maxRequests - bucket.timestamps.length),
+    retryAfterSeconds: 0,
+    resetAtEpochSeconds: Math.ceil((now + windowMs) / 1000),
+  };
+}
+
+export function resetRateLimiterMemory(): void {
+  memoryBuckets.clear();
+}
+
+export function bookingRateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const forwarded = req.headers['x-forwarded-for'];
+  const ip =
+    (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.ip) || 'unknown-ip';
+
+  const customActor =
+    (req.headers['x-client-id'] as string) ||
+    (req.headers['x-rate-limit-key'] as string) ||
+    ip;
+
+  const bucketKey = `booking:${customActor}`;
+  const status = evaluateSlidingWindow(bucketKey);
+
+  res.setHeader('X-RateLimit-Limit', String(config.rateLimitMaxRequests));
+  res.setHeader('X-RateLimit-Remaining', String(status.remaining));
+  res.setHeader('X-RateLimit-Reset', String(status.resetAtEpochSeconds));
+
+  if (!status.allowed) {
+    res.setHeader('Retry-After', String(status.retryAfterSeconds));
+    return next(
+      new ApiError(
+        429,
+        'RATE_LIMIT_EXCEEDED',
+        `Rate limit exceeded. Try again in ${status.retryAfterSeconds} seconds.`
+      )
+    );
+  }
+
+  next();
 }
