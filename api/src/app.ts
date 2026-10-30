@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import crypto from 'node:crypto';
 import cors from 'cors';
 import { config } from './config.js';
 import { withTransaction } from './db.js';
@@ -100,16 +101,24 @@ app.post(['/reset', '/api/reset', '/v1/reset'], apiKeyAuth, async (req, res, nex
     await withTransaction(async (client) => {
       await client.query('DELETE FROM bookings');
       await client.query('DELETE FROM idempotency_keys');
-      if (Array.isArray(incomingSlots) && incomingSlots.length > 0) {
+      if (Array.isArray(incomingSlots)) {
         await client.query('DELETE FROM slots');
         for (const slot of incomingSlots) {
           const provider = slot.provider || slot.doctor_name || slot.doctorName || 'Dr Ade';
-          const startTime = new Date(slot.start || slot.startTime || slot.start_time).toISOString();
-          const endTime = new Date(slot.end || slot.endTime || slot.end_time).toISOString();
+          const startParsed = new Date(slot.start || slot.startTime || slot.start_time);
+          const endParsed = new Date(slot.end || slot.endTime || slot.end_time);
+          if (isNaN(startParsed.getTime()) || isNaN(endParsed.getTime())) {
+            throw new ApiError(400, 'INVALID_DATE', 'Invalid slot start or end date.');
+          }
           await client.query(
             `INSERT INTO slots (id, provider, doctor_name, start_time, end_time, is_available)
              VALUES ($1, $2, $2, $3, $4, TRUE)`,
-            [String(slot.id), provider, startTime, endTime]
+            [
+              String(slot.id || crypto.randomUUID()),
+              provider,
+              startParsed.toISOString(),
+              endParsed.toISOString(),
+            ]
           );
         }
       } else {
@@ -154,6 +163,10 @@ app.use((_req, _res, next) => {
 });
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err?.retryAfter) {
+    res.setHeader('Retry-After', String(err.retryAfter));
+  }
+
   if (err instanceof SyntaxError && 'body' in err) {
     res.status(400).json({
       error: 'Malformed JSON request body.',

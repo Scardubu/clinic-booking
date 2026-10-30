@@ -48,19 +48,34 @@ export async function listSlots(provider?: string, onlyAvailable = false): Promi
 
   if (provider && provider.trim()) {
     values.push(provider.trim());
-    filters.push(`(provider = $${values.length} OR doctor_name = $${values.length})`);
+    filters.push(`(s.provider = $${values.length} OR s.doctor_name = $${values.length})`);
   }
 
   if (onlyAvailable) {
-    filters.push('is_available = TRUE');
+    filters.push(`NOT EXISTS (
+      SELECT 1 FROM bookings b
+      WHERE b.slot_id = s.id AND LOWER(b.status) = 'confirmed'
+    )`);
   }
 
   const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
   const sql = `
-    SELECT id, COALESCE(provider, doctor_name) AS provider, doctor_name, start_time, end_time, is_available
-    FROM slots
+    SELECT
+      s.id,
+      COALESCE(s.provider, s.doctor_name) AS provider,
+      s.doctor_name,
+      s.start_time,
+      s.end_time,
+      (CASE
+        WHEN EXISTS (
+          SELECT 1 FROM bookings b
+          WHERE b.slot_id = s.id AND LOWER(b.status) = 'confirmed'
+        ) THEN FALSE
+        ELSE TRUE
+      END) AS is_available
+    FROM slots s
     ${whereClause}
-    ORDER BY start_time ASC, id ASC
+    ORDER BY s.start_time ASC, s.id ASC
   `;
 
   const { rows } = await pool.query(sql, values);
@@ -73,9 +88,21 @@ export async function getSlotById(slotId: string): Promise<SlotDTO> {
     throw new ApiError(404, 'SLOT_NOT_FOUND', "The slot doesn't exist");
   }
   const { rows, rowCount } = await pool.query(
-    `SELECT id, COALESCE(provider, doctor_name) AS provider, doctor_name, start_time, end_time, is_available
-     FROM slots
-     WHERE id = $1`,
+    `SELECT
+       s.id,
+       COALESCE(s.provider, s.doctor_name) AS provider,
+       s.doctor_name,
+       s.start_time,
+       s.end_time,
+       (CASE
+         WHEN EXISTS (
+           SELECT 1 FROM bookings b
+           WHERE b.slot_id = s.id AND LOWER(b.status) = 'confirmed'
+         ) THEN FALSE
+         ELSE TRUE
+       END) AS is_available
+     FROM slots s
+     WHERE s.id = $1`,
     [cleanId]
   );
   if (!rowCount || !rows[0]) {

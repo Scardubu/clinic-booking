@@ -45,6 +45,16 @@ async function runSpecVerification() {
 
   // Step 1: POST /reset with exact spec payload
   console.log('1. Testing POST /reset with custom slots (including past slot)...');
+  
+  // Test reset with empty array leaves exactly 0 slots
+  const emptyResetRes = await request('/reset', {
+    method: 'POST',
+    body: { slots: [] },
+  });
+  assert.equal(emptyResetRes.status, 200, 'POST /reset with empty slots must return 200');
+  const emptySlotsRes = await request('/slots');
+  assert.equal(emptySlotsRes.data.slots.length, 0, 'POST /reset with { slots: [] } must leave 0 slots');
+
   const customSlots = [
     {
       id: 's-past',
@@ -230,14 +240,16 @@ async function runSpecVerification() {
   });
   assert.equal(idemAttempt1.status, 201);
 
-  // Exact same body and key -> must return same 201 and same booking id
-  const idemAttempt2 = await request('/bookings', {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idemKey },
-    body: { slot_id: 's-dr-ade-2', name: 'Emeka', email: 'emeka@example.com' },
-  });
-  assert.equal(idemAttempt2.status, 201);
-  assert.equal(idemAttempt1.data.id, idemAttempt2.data.id);
+  // Exact same body and key replayed 6 times -> must return 201 each time without hitting rate limit
+  for (let r = 2; r <= 7; r++) {
+    const replayAttempt = await request('/bookings', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idemKey },
+      body: { slot_id: 's-dr-ade-2', name: 'Emeka', email: 'emeka@example.com' },
+    });
+    assert.equal(replayAttempt.status, 201, `Replay #${r} must return 201 and not consume rate limit budget`);
+    assert.equal(replayAttempt.data.id, idemAttempt1.data.id, `Replay #${r} must return identical booking ID`);
+  }
 
   // Different body with same key -> must return 422
   const idemAttempt3 = await request('/bookings', {

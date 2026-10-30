@@ -82,13 +82,24 @@ export function mapBookingRow(row: any): BookingDTO {
   return dto;
 }
 
+export async function getIdempotencyRecord(key: string, clientScope = 'global') {
+  const { rows } = await pool.query(
+    `SELECT request_hash, response_status, response_body, status
+     FROM idempotency_keys
+     WHERE client_scope = $1 AND idempotency_key = $2 AND expires_at > NOW()`,
+    [clientScope, key]
+  );
+  return rows[0] || null;
+}
+
 export async function createBooking(
   input: CreateBookingInput,
   idempotencyKey?: string,
-  clientScope = 'global'
+  clientScope = 'global',
+  rawBody?: any
 ): Promise<{ statusCode: number; body: any; replayed: boolean }> {
   const cleanIdemKey = idempotencyKey?.trim();
-  const requestHash = hashPayload(input);
+  const requestHash = hashPayload(rawBody ?? input);
 
   return withTransaction(async (client) => {
     if (cleanIdemKey) {
@@ -317,8 +328,12 @@ export interface ListBookingsQuery {
 
 export async function listBookingsPaginated(params: ListBookingsQuery) {
   if (params.limit !== undefined) {
-    const num = Number(params.limit);
-    if (!Number.isInteger(num) || num < 1 || num > 50) {
+    const rawLimit = String(params.limit).trim();
+    if (!/^\d+$/.test(rawLimit)) {
+      throw new ApiError(400, 'INVALID_LIMIT', 'Invalid limit');
+    }
+    const num = Number(rawLimit);
+    if (num < 1 || num > 50) {
       throw new ApiError(400, 'INVALID_LIMIT', 'Invalid limit');
     }
   }
@@ -375,7 +390,7 @@ export async function listBookingsPaginated(params: ListBookingsQuery) {
      FROM bookings b
      JOIN slots s ON s.id = b.slot_id
      ${whereClause}
-     ORDER BY b.created_at ASC, b.id ASC
+     ORDER BY date_trunc('milliseconds', b.created_at) ASC, b.id ASC
      LIMIT $${limitIdx}
      ${offsetSql}`,
     values

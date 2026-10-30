@@ -50,7 +50,9 @@ exactly one booking, and the 6th simultaneous attempt for an email cannot slip p
 - *String slot IDs are supported.* Slot identifiers may be arbitrary strings (e.g. `"s1"`, `"s2"`) or UUIDs.
 - *Past slot booking prevention.* Booking a slot whose start time has already passed returns 400 (`"The slot has already started"`).
 - *Strict pagination limit.* `limit` query param on `GET /bookings` must be an integer between 1 and 50; anything else returns 400.
-- *Order is oldest first.* `GET /bookings` orders by `created_at ASC, id ASC`, matching the spec.
+- *Order is oldest first.* `GET /bookings` orders by `date_trunc('milliseconds', b.created_at) ASC, b.id ASC`, matching both the keyset cursor comparison and OpenAPI spec.
+- *Exact slot replacement on reset.* `POST /reset` with `{ slots: [] }` accurately sets slot count to 0, or replaces with provided custom slots, while omitting `slots` reseeds 24 default future slots.
+- *Dynamic availability evaluation.* `GET /slots` evaluates availability directly via `NOT EXISTS (SELECT 1 FROM bookings ... WHERE LOWER(status) = 'confirmed')` to guarantee availability strictly adheres to "false while the slot has a confirmed booking".
 - *Error envelope consistency.* Top-level `error` is always a descriptive string (`{"error": "<message>"}`).
 
 **4. The Vercel function is a proxy, not just hosting.**
