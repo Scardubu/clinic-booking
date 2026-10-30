@@ -424,9 +424,13 @@ npm run test:frontend
 2. Configure settings:
    - **Root Directory:** `web`
    - **Framework Preset:** `Other` (static)
-3. Configure Environment Variables:
-   - `BACKEND_URL`: Render service URL (e.g., `https://clinic-booking-api-od9i.onrender.com`).
-   - `API_KEY`: Must match the secret `API_KEY` configured in the Render backend.
+3. Configure Environment Variables (Optional — Safe Defaults Included):
+   - `BACKEND_URL`: Render service URL (defaults automatically to `https://clinic-booking-api-od9i.onrender.com`).
+   - `API_KEY`: Secret API key (defaults automatically to the live demo key if unset).
+4. Edge Proxy Resilience & Cold-Start Protections:
+   - **Universal Response Abstraction:** `web/api/[...path].js` detects and binds to both standard Node.js `http.ServerResponse` (`statusCode`/`end`) and `@vercel/node` wrappers (`status`/`json`), eliminating `TypeError: res.status is not a function` in all runtime environments.
+   - **Extended Execution Duration:** Configured with `maxDuration: 60` in `vercel.json` and `[...path].js` to gracefully wait for Render free-tier instances to awaken from idle sleep.
+   - **Intelligent Frontend Backoff:** `web/index.html` automatically retries connection up to 3 times with friendly guidance while upstream instances boot up.
 
 ---
 

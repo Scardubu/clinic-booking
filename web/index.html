@@ -1117,15 +1117,14 @@
     }
 
     function getErrorMessage(res, data) {
-      if (res && (res.status === 500 || res.status === 502)) {
-        return 'Unable to reach booking server. Please check API configuration.';
+      if (data?.message) return data.message;
+      if (data?.error?.message) return data.error.message;
+      if (data?.details) return data.details;
+      if (data?.error && typeof data.error === 'string') return data.error;
+      if (res && (res.status === 500 || res.status === 502 || res.status === 504)) {
+        return 'Connecting to clinic server. The service may be waking up from idle mode (up to 30s). Please wait or retry.';
       }
-      return (
-        data?.error?.message ||
-        data?.message ||
-        data?.details ||
-        (res ? `Request failed (HTTP ${res.status})` : 'Unable to reach booking server. Please check API configuration.')
-      );
+      return (res ? `Request failed (HTTP ${res.status})` : 'Unable to reach booking server. Please check API configuration.');
     }
 
     // Helper: Escape HTML to prevent injection
@@ -1388,7 +1387,7 @@
     }
 
     // Task 1: Fetch and Render Slots with Instant Active Selection
-    async function fetchSlots() {
+    async function fetchSlots(retryCount = 0) {
       const grid = document.getElementById('slotsGrid');
       try {
         const res = await fetch(`${API_BASE}/slots`, { headers: buildHeaders() });
@@ -1401,7 +1400,29 @@
 
         renderSlots();
       } catch (err) {
-        grid.innerHTML = `<p style="color:var(--danger); padding:0.5rem 0;">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
+        if (retryCount < 2 && (err.message.includes('waking up') || err.message.includes('Connecting') || err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+          grid.innerHTML = `
+            <div class="empty-state small" style="grid-column: 1 / -1;">
+              <span class="empty-state-icon">⏳</span>
+              <div>
+                <div class="empty-state-title">Connecting to clinic server...</div>
+                <p class="empty-state-desc">Server instance is warming up (attempt ${retryCount + 1}/3). Retrying in 4 seconds...</p>
+              </div>
+            </div>
+          `;
+          setTimeout(() => fetchSlots(retryCount + 1), 4000);
+          return;
+        }
+        grid.innerHTML = `
+          <div class="empty-state small" style="grid-column: 1 / -1;">
+            <span class="empty-state-icon">⚠️</span>
+            <div>
+              <div class="empty-state-title" style="color:var(--danger); font-size:0.92rem;">${escapeHtml(err.message || 'Unable to reach booking server. Please check API configuration.')}</div>
+              <p class="empty-state-desc" style="margin-top:0.35rem;">If the server is waking from idle mode, click below to retry.</p>
+              <button type="button" class="btn-outline" onclick="fetchSlots()" style="margin-top:0.6rem; padding:0.3rem 0.75rem; font-size:0.8rem; width:auto;">↻ Retry Loading Slots</button>
+            </div>
+          </div>
+        `;
       }
     }
 
@@ -1913,7 +1934,7 @@
       if (nextCursor) await fetchBookings(nextCursor);
     }
 
-    async function fetchBookings(cursor = null) {
+    async function fetchBookings(cursor = null, retryCount = 0) {
       const listEl = document.getElementById('bookingsList');
       const emailInput = document.getElementById('searchEmail');
       const email = emailInput ? emailInput.value.trim() : '';
@@ -2021,7 +2042,29 @@
           `;
         }).join('');
       } catch (err) {
-        listEl.innerHTML = `<p style="color:var(--danger); padding:0.5rem 0;">${err.message || 'Unable to reach booking server. Please check API configuration.'}</p>`;
+        if (retryCount < 2 && (err.message.includes('waking up') || err.message.includes('Connecting') || err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+          listEl.innerHTML = `
+            <div class="empty-state small">
+              <span class="empty-state-icon">⏳</span>
+              <div>
+                <div class="empty-state-title">Connecting to clinic server...</div>
+                <p class="empty-state-desc">Checking patient bookings (attempt ${retryCount + 1}/3)...</p>
+              </div>
+            </div>
+          `;
+          setTimeout(() => fetchBookings(cursor, retryCount + 1), 4000);
+          return;
+        }
+        listEl.innerHTML = `
+          <div class="empty-state small">
+            <span class="empty-state-icon">⚠️</span>
+            <div>
+              <div class="empty-state-title" style="color:var(--danger); font-size:0.92rem;">${escapeHtml(err.message || 'Unable to reach booking server. Please check API configuration.')}</div>
+              <p class="empty-state-desc" style="margin-top:0.35rem;">If the server is waking from idle mode, click below to retry.</p>
+              <button type="button" class="btn-outline" onclick="loadFirstPage()" style="margin-top:0.6rem; padding:0.3rem 0.75rem; font-size:0.8rem; width:auto;">↻ Retry Bookings</button>
+            </div>
+          </div>
+        `;
       }
     }
 
