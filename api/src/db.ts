@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool, PoolClient, Client } from 'pg';
 import dns from 'dns';
 import fs from 'fs';
 import path from 'path';
@@ -134,14 +134,23 @@ function buildPoolConfig(rawUrl: string) {
     connectionString: cleanConnectionString,
     ssl,
     max: 15,
-    idleTimeoutMillis: 10000,
-    connectionTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 90000,
     keepAlive: true,
     keepAliveInitialDelayMillis: 5000,
   };
 }
 
-export const pool = new Pool(buildPoolConfig(config.databaseUrl));
+export class ResilientClient extends Client {
+  constructor(options?: any) {
+    super(options);
+    this.on('error', (err: any) => {
+      console.warn('[DB_CLIENT_SOCKET_WARN]', err?.message || err);
+    });
+  }
+}
+
+export const pool: Pool = new (Pool as any)(buildPoolConfig(config.databaseUrl), ResilientClient);
 
 pool.on('error', (err) => {
   console.warn('[DB_POOL_IDLE_WARN]', err.message);
@@ -168,13 +177,15 @@ const originalPoolQuery = pool.query.bind(pool);
         err?.code === 'ECONNRESET' ||
         err?.code === 'EPIPE' ||
         err?.code === 'ETIMEDOUT' ||
+        err?.code === 'ECONNREFUSED' ||
         err?.message?.includes('Connection terminated') ||
+        err?.message?.includes('socket disconnected') ||
         err?.message?.includes('read ECONNRESET');
       if (isTransient && attempt < 3) {
         console.warn(
           `[DB] Transient connection drop on pool.query (${err.code || err.message}), retrying (${attempt + 1}/3)...`
         );
-        await new Promise((r) => setTimeout(r, 200 * attempt));
+        await new Promise((r) => setTimeout(r, 300 * attempt));
         continue;
       }
       throw err;
@@ -185,7 +196,7 @@ const originalPoolQuery = pool.query.bind(pool);
 
 export async function withTransaction<T>(
   fn: (client: PoolClient) => Promise<T>,
-  maxRetries = 2
+  maxRetries = 4
 ): Promise<T> {
   let lastErr: any;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -194,8 +205,20 @@ export async function withTransaction<T>(
       client = await pool.connect();
     } catch (err: any) {
       lastErr = err;
-      if (attempt < maxRetries) {
-        await new Promise((r) => setTimeout(r, 400));
+      const isTransient =
+        err?.code === 'ECONNRESET' ||
+        err?.code === 'EPIPE' ||
+        err?.code === 'ETIMEDOUT' ||
+        err?.code === 'ECONNREFUSED' ||
+        err?.message?.includes('Connection terminated') ||
+        err?.message?.includes('socket disconnected') ||
+        err?.message?.includes('read ECONNRESET');
+      if (isTransient && attempt < maxRetries) {
+        const delay = attempt * 600;
+        console.warn(
+          `[DB] Transient pool.connect drop in withTransaction (${err.code || err.message}), retrying in ${delay}ms (${attempt + 1}/${maxRetries})...`
+        );
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
       throw err;
@@ -217,13 +240,16 @@ export async function withTransaction<T>(
         err?.code === 'ECONNRESET' ||
         err?.code === 'EPIPE' ||
         err?.code === 'ETIMEDOUT' ||
+        err?.code === 'ECONNREFUSED' ||
         err?.message?.includes('Connection terminated') ||
+        err?.message?.includes('socket disconnected') ||
         err?.message?.includes('read ECONNRESET');
       if (isTransient && attempt < maxRetries) {
+        const delay = attempt * 600;
         console.warn(
-          `[DB] Transient connection drop in withTransaction (${err.code || err.message}), retrying (${attempt + 1}/${maxRetries})...`
+          `[DB] Transient connection drop in withTransaction (${err.code || err.message}), retrying in ${delay}ms (${attempt + 1}/${maxRetries})...`
         );
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, delay));
         continue;
       }
       throw err;

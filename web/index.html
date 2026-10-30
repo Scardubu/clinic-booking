@@ -387,12 +387,18 @@
       margin-bottom: 1rem;
       font-size: 0.9rem;
       font-family: inherit;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+    input::placeholder, textarea::placeholder {
+      color: #64748b;
+      opacity: 0.85;
+      font-size: 0.88rem;
     }
     input:focus, textarea:focus {
       outline: none;
       border-color: var(--cyan);
-      box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.2);
+      box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.22);
+      background: #0c0f17;
     }
     input[readonly] {
       background: #07080b;
@@ -400,32 +406,170 @@
       cursor: not-allowed;
     }
 
-    .input-with-copy {
-      position: relative;
-      margin-bottom: 1rem;
+    /* Selected Slot Summary Card (Replaces raw UUID input clutter) */
+    .selected-slot-card {
+      margin-bottom: 1.15rem;
+      border-radius: var(--radius-md);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .input-with-copy input {
-      margin-bottom: 0;
-      padding-right: 4.8rem;
+    .selected-slot-card.empty {
+      background: #090b10;
+      border: 1px dashed var(--border);
+      padding: 1rem 1.15rem;
     }
-    .input-with-copy .copy-btn {
-      position: absolute;
-      right: 0.5rem;
-      top: 50%;
-      transform: translateY(-50%);
+    .selected-slot-empty {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+    .selected-slot-empty-icon {
+      font-size: 1.6rem;
+      line-height: 1;
+    }
+    .selected-slot-empty-text strong {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--text);
+      margin-bottom: 0.15rem;
+    }
+    .selected-slot-empty-text p {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin: 0;
+    }
+    .selected-slot-card.active {
+      background: linear-gradient(135deg, rgba(0, 217, 255, 0.08) 0%, rgba(14, 16, 23, 0.95) 100%);
+      border: 1px solid rgba(0, 217, 255, 0.4);
+      padding: 1rem 1.15rem;
+      box-shadow: 0 0 16px rgba(0, 217, 255, 0.1);
+      animation: fadeIn 0.2s ease-out;
+    }
+    .selected-slot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(0, 217, 255, 0.15);
+    }
+    .selected-slot-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .btn-change-slot {
+      width: auto;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.76rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-change-slot:hover {
+      background: var(--cyan-tint);
+      color: var(--cyan);
+      border-color: rgba(0, 217, 255, 0.4);
+    }
+    .selected-slot-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    @media (max-width: 540px) {
+      .selected-slot-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .selected-slot-item-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .selected-slot-item-val {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .selected-slot-spec {
+      display: inline-block;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.04);
+      padding: 0.1rem 0.45rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      margin-top: 0.25rem;
+    }
+    .slot-required-alert {
+      border-color: var(--danger) !important;
+      box-shadow: 0 0 16px rgba(255, 77, 109, 0.35) !important;
+      animation: shake 0.3s ease-in-out;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
     }
 
-    .selected-slot-indicator {
-      display: none;
-      padding: 0.6rem 0.85rem;
-      border-radius: var(--radius-sm);
-      background: rgba(0, 217, 255, 0.08);
-      border: 1px solid rgba(0, 217, 255, 0.3);
-      color: var(--text);
-      font-size: 0.82rem;
-      margin-bottom: 0.85rem;
+    /* Welcoming Empty State Displays across Sections */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 0.5rem;
+      justify-content: center;
+      text-align: center;
+      padding: 2.25rem 1.5rem;
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      margin: 0.5rem 0;
+      transition: all 0.2s ease;
+    }
+    .empty-state.small {
+      padding: 1.15rem 1rem;
+      flex-direction: row;
+      text-align: left;
+      gap: 0.85rem;
+    }
+    .empty-state.error {
+      border-color: rgba(255, 77, 109, 0.35);
+      background: rgba(255, 77, 109, 0.04);
+    }
+    .empty-state-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      line-height: 1;
+    }
+    .empty-state.small .empty-state-icon {
+      margin-bottom: 0;
+      font-size: 1.4rem;
+    }
+    .empty-state-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+    .empty-state-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      max-width: 420px;
+      line-height: 1.5;
+      margin: 0;
     }
 
     /* Buttons */
@@ -482,6 +626,15 @@
       background: rgba(255, 77, 109, 0.25);
       border-color: var(--danger);
       box-shadow: 0 0 10px rgba(255, 77, 109, 0.3);
+    }
+    button:focus-visible,
+    .btn-outline:focus-visible,
+    .btn-danger:focus-visible,
+    .btn-receipt-action:focus-visible,
+    .copy-btn:focus-visible,
+    .btn-change-slot:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
     }
 
     /* Consolidated Success Receipt Card */
@@ -656,6 +809,29 @@
       background: var(--danger);
       color: #fff;
     }
+    .btn-receipt-action.view-bookings {
+      background: rgba(0, 255, 102, 0.12);
+      border: 1px solid rgba(0, 255, 102, 0.4);
+      color: var(--emerald);
+    }
+    .btn-receipt-action.view-bookings:hover {
+      background: var(--emerald);
+      color: #050608;
+    }
+    .receipt-copied-notice {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--emerald);
+      background: rgba(0, 255, 102, 0.12);
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 255, 102, 0.3);
+      text-transform: none;
+      letter-spacing: normal;
+    }
 
     /* Patient Bookings list items */
     .booking-item {
@@ -750,10 +926,17 @@
             <h2><span>👥</span> 3. Patient Bookings &amp; Cursor Pagination</h2>
           </div>
           <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
-            <input type="email" id="searchEmail" placeholder="🔍 Filter by patient email (e.g. adaeze@example.com)..." style="margin:0;" />
+            <input type="email" id="searchEmail" placeholder="🔍 Filter by patient email (e.g. adaeze@example.com)..." aria-label="Filter appointments by patient email" onkeydown="if(event.key==='Enter'){event.preventDefault();loadFirstPage();}" style="margin:0;" />
             <button type="button" class="btn-outline" onclick="loadFirstPage()" style="white-space:nowrap;">Filter</button>
+            <button type="button" class="btn-outline" onclick="clearEmailFilter()" style="white-space:nowrap;" title="Clear email filter and show all bookings">Clear</button>
           </div>
-          <div id="bookingsList" aria-live="polite">Loading bookings...</div>
+          <div id="bookingsList" aria-live="polite">
+            <div class="empty-state">
+              <span class="empty-state-icon">📋</span>
+              <div class="empty-state-title">No appointments loaded yet</div>
+              <p class="empty-state-desc">Enter your booking email above or complete a new appointment to view your history.</p>
+            </div>
+          </div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1.15rem; flex-wrap:wrap; gap:0.5rem;">
             <span id="paginationStats" class="mono"></span>
             <div style="display:flex; gap:0.5rem;">
@@ -772,36 +955,42 @@
             <h2><span>📝</span> 2. Complete Your Booking</h2>
           </div>
           <form id="bookForm" onsubmit="handleBookSubmit(event)">
-            <label for="slotId">
-              <span>🆔</span> Selected Slot ID <span class="req">*</span>
+            <!-- Hidden slotId input to store UUID securely without exposing raw clutter to patients -->
+            <input type="hidden" id="slotId" name="slotId" value="" />
+            <button type="button" id="copySlotInputBtn" style="display:none;" aria-hidden="true"></button>
+
+            <label style="margin-bottom:0.45rem;">
+              <span>📅</span> Selected Appointment Slot <span class="req">*</span>
             </label>
-            <div id="slotSelectionSummary" class="selected-slot-indicator"></div>
-            <div class="input-with-copy">
-              <input type="text" id="slotId" placeholder="Click an available slot on the left" readonly required />
-              <button type="button" class="copy-btn" id="copySlotInputBtn" onclick="copySlotInputVal(this, event)" style="display:none;" title="Copy Selected Slot ID">
-                Copy
-              </button>
+            <div id="slotSelectionSummary" class="selected-slot-card empty" role="region" aria-live="polite">
+              <div class="selected-slot-empty">
+                <span class="selected-slot-empty-icon">📅</span>
+                <div class="selected-slot-empty-text">
+                  <strong>No appointment slot selected</strong>
+                  <p>Choose an available slot from Step 1 on the left to continue.</p>
+                </div>
+              </div>
             </div>
 
             <label for="patientName">
               <span>👤</span> Patient Full Name <span class="req">*</span>
             </label>
-            <input type="text" id="patientName" placeholder="Adaeze Nwosu" required minlength="2" />
+            <input type="text" id="patientName" placeholder="e.g. Adaeze Nwosu" required minlength="2" />
 
             <label for="patientEmail">
               <span>📧</span> Patient Email <span class="req">*</span>
             </label>
-            <input type="email" id="patientEmail" placeholder="adaeze@example.com" required />
+            <input type="email" id="patientEmail" placeholder="e.g. adaeze@example.com" required />
 
             <label for="patientPhone">
               <span>📱</span> Patient Phone <span class="opt">(Optional)</span>
             </label>
-            <input type="tel" id="patientPhone" placeholder="+234 803 123 4567" />
+            <input type="tel" id="patientPhone" placeholder="e.g. +234 803 123 4567" />
 
             <label for="reason">
               <span>📋</span> Reason for Visit <span class="opt">(Optional)</span>
             </label>
-            <textarea id="reason" rows="2" placeholder="Annual physical consultation"></textarea>
+            <textarea id="reason" rows="2" placeholder="e.g. Routine consultation, physical checkup, or symptoms..."></textarea>
 
             <button type="submit" id="bookBtn">
               <span>✨ Book Appointment</span>
@@ -823,10 +1012,18 @@
             <h2><span>🔎</span> 4. Look Up Single Booking by ID</h2>
           </div>
           <div style="display:flex; gap:0.5rem;">
-            <input type="text" id="lookupId" placeholder="🆔 Paste Booking UUID..." style="margin:0;" />
+            <input type="text" id="lookupId" placeholder="Paste Booking Reference ID (e.g. 1643a64e-...)" aria-label="Booking Reference ID" onkeydown="if(event.key==='Enter'){event.preventDefault();lookupSingleBooking();}" style="margin:0;" />
             <button type="button" class="btn-outline" onclick="lookupSingleBooking()" style="white-space:nowrap;">Look Up</button>
           </div>
-          <div id="lookupResult" style="margin-top:0.75rem;" aria-live="polite"></div>
+          <div id="lookupResult" style="margin-top:0.75rem;" aria-live="polite">
+            <div class="empty-state small">
+              <span class="empty-state-icon">🔍</span>
+              <div>
+                <div class="empty-state-title">Look up your appointment</div>
+                <p class="empty-state-desc">Enter your Booking Reference ID above to retrieve your appointment details, check confirmation status, or cancel a booking.</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -842,7 +1039,8 @@
         ? 'koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c'
         : '');
 
-    let cachedSlots = [];
+    let cachedSlots = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots)) ? window.cachedSlots : [];
+    if (typeof window !== 'undefined') window.cachedSlots = cachedSlots;
     let selectedSlotId = '';
     let nextCursor = null;
     let currentIdempotencyKey = crypto.randomUUID();
@@ -887,6 +1085,17 @@
       );
     }
 
+    // Helper: Escape HTML to prevent injection
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // Helper: Parse Doctor Name and Specialization
     function parseDoctorInfo(providerStr) {
       if (!providerStr) return { name: 'Clinic Physician', spec: 'General Practice' };
@@ -927,7 +1136,7 @@
         event.stopPropagation();
         event.preventDefault();
       }
-      if (!text) return;
+      if (!text) return false;
 
       let succeeded = false;
       if (navigator.clipboard && window.isSecureContext) {
@@ -948,10 +1157,12 @@
           ta.style.left = '-9999px';
           ta.style.opacity = '0';
           document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          succeeded = document.execCommand('copy');
-          document.body.removeChild(ta);
+          if (typeof ta.focus === 'function') ta.focus();
+          if (typeof ta.select === 'function') ta.select();
+          succeeded = document.execCommand && document.execCommand('copy');
+          if (document.body && typeof document.body.removeChild === 'function') {
+            document.body.removeChild(ta);
+          }
         } catch (err) {
           console.error('Clipboard copy failed:', err);
         }
@@ -985,10 +1196,105 @@
           btnElement._copyTimeout = null;
         }, 2000);
       }
+
+      return succeeded;
+    }
+
+    // UI Helper: Update Selected Slot Summary Card (Clean & human-readable)
+    function updateSelectedSlotUI(id) {
+      const summary = document.getElementById('slotSelectionSummary');
+      if (!summary) return;
+      summary.style.display = 'block';
+
+      if (!id) {
+        summary.className = 'selected-slot-card empty';
+        summary.innerHTML = `
+          <div class="selected-slot-empty">
+            <span class="selected-slot-empty-icon">📅</span>
+            <div class="selected-slot-empty-text">
+              <strong>No appointment slot selected</strong>
+              <p>Choose an available slot from Step 1 on the left to continue.</p>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const slotsList = (typeof window !== 'undefined' && Array.isArray(window.cachedSlots)) ? window.cachedSlots : cachedSlots;
+      const slotObj = slotsList.find(s => s.id === id);
+      const doc = slotObj ? parseDoctorInfo(slotObj.provider || slotObj.doctorName || slotObj.doctor_name) : { name: 'Clinic Physician', spec: 'General Practice' };
+      const rawDate = slotObj ? (slotObj.start || slotObj.startTime || slotObj.start_time) : null;
+      const dtLong = rawDate ? formatDateTime(rawDate, 'long') : 'Selected Appointment Time';
+
+      summary.className = 'selected-slot-card active';
+      summary.innerHTML = `
+        <div class="selected-slot-header">
+          <span class="selected-slot-tag">✓ Selected Slot</span>
+          <button type="button" class="btn-change-slot" onclick="changeSlot()" title="Return to Section 1 to pick a different slot" aria-label="Change appointment slot">
+            <span>⇄ Change Slot</span>
+          </button>
+        </div>
+        <div class="selected-slot-grid">
+          <div class="selected-slot-item">
+            <div class="selected-slot-item-label"><span>🩺</span> Doctor</div>
+            <div class="selected-slot-item-val">${escapeHtml(doc.name)}</div>
+            ${doc.spec ? `<span class="selected-slot-spec">${escapeHtml(doc.spec)}</span>` : ''}
+          </div>
+          <div class="selected-slot-item">
+            <div class="selected-slot-item-label"><span>🕒</span> Date &amp; Time</div>
+            <div class="selected-slot-item-val" style="color:var(--cyan);">${escapeHtml(dtLong)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // UI Helper: Change Slot returns focus to Section 1
+    function changeSlot() {
+      const slotsSec = document.getElementById('slotsSection');
+      if (slotsSec) {
+        if (typeof slotsSec.scrollIntoView === 'function') {
+          slotsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        const targetSlot = slotsSec.querySelector('.slot-card.selected') || slotsSec.querySelector('.slot-card');
+        if (targetSlot && typeof targetSlot.focus === 'function') {
+          targetSlot.focus();
+        } else {
+          const refreshBtn = slotsSec.querySelector('button');
+          if (refreshBtn && typeof refreshBtn.focus === 'function') refreshBtn.focus();
+        }
+      }
+    }
+
+    // UI Helper: Scroll to Section 3 (Patient Bookings)
+    function scrollToBookings() {
+      const sec = document.getElementById('bookingsSection');
+      if (sec) {
+        if (typeof sec.scrollIntoView === 'function') {
+          sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        const firstItem = sec.querySelector('.booking-item');
+        if (firstItem) {
+          firstItem.setAttribute('tabindex', '-1');
+          if (typeof firstItem.focus === 'function') firstItem.focus();
+        } else {
+          const emailInput = document.getElementById('searchEmail');
+          if (emailInput && typeof emailInput.focus === 'function') emailInput.focus();
+        }
+      }
+    }
+
+    // UI Helper: Clear email filter in Section 3
+    function clearEmailFilter() {
+      const input = document.getElementById('searchEmail');
+      if (input) {
+        input.value = '';
+        loadFirstPage();
+      }
     }
 
     function copySlotInputVal(btn, event) {
-      const val = document.getElementById('slotId').value.trim();
+      const el = document.getElementById('slotId');
+      const val = el ? el.value.trim() : '';
       copyText(val, btn, event);
     }
 
@@ -1014,7 +1320,13 @@
       if (!grid) return;
 
       if (!cachedSlots || cachedSlots.length === 0) {
-        grid.innerHTML = '<p style="color:var(--muted); padding:0.5rem 0;">No available clinic slots remaining at this time.</p>';
+        grid.innerHTML = `
+          <div class="empty-state" style="grid-column: 1 / -1; padding: 2rem 1.25rem;">
+            <span class="empty-state-icon">🕒</span>
+            <div class="empty-state-title">No appointment slots currently available</div>
+            <p class="empty-state-desc">All clinic slots are currently booked. Please refresh the list or check back shortly as cancellations reopen slots immediately.</p>
+          </div>
+        `;
         return;
       }
 
@@ -1077,16 +1389,9 @@
       if (input) input.value = id;
 
       const copyBtn = document.getElementById('copySlotInputBtn');
-      if (copyBtn) copyBtn.style.display = 'inline-flex';
+      if (copyBtn) copyBtn.style.display = 'none';
 
-      const summary = document.getElementById('slotSelectionSummary');
-      const slotObj = cachedSlots.find(s => s.id === id);
-      if (summary && slotObj) {
-        const doc = parseDoctorInfo(slotObj.provider || slotObj.doctorName || slotObj.doctor_name);
-        const dt = formatDateTime(slotObj.start || slotObj.startTime || slotObj.start_time, 'short');
-        summary.innerHTML = `<span>✓</span> <strong>Selected:</strong> ${doc.name} ${doc.spec ? `(${doc.spec})` : ''} • ${dt}`;
-        summary.style.display = 'flex';
-      }
+      updateSelectedSlotUI(id);
 
       currentIdempotencyKey = crypto.randomUUID();
 
@@ -1118,24 +1423,34 @@
 
     // Task 3: Consolidated Success Receipt Card & Submission Handler
     async function handleBookSubmit(e) {
-      e.preventDefault();
+      if (e && typeof e.preventDefault === 'function') e.preventDefault();
       const btn = document.getElementById('bookBtn');
-      const originalBtnHtml = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = '<span>⏳ Booking Appointment...</span>';
+      const originalBtnHtml = btn ? btn.innerHTML : '<span>✨ Book Appointment</span>';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>⏳ Booking Appointment...</span>';
+      }
 
-      const slotVal = document.getElementById('slotId').value.trim();
+      const slotVal = document.getElementById('slotId') ? document.getElementById('slotId').value.trim() : '';
       if (!slotVal) {
-        notify('Please select an available appointment slot first.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalBtnHtml;
+        notify('Please select an available appointment slot from Step 1 first.', 'error');
+        const summary = document.getElementById('slotSelectionSummary');
+        if (summary) {
+          summary.classList.add('slot-required-alert');
+          setTimeout(() => summary.classList.remove('slot-required-alert'), 2500);
+        }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHtml;
+        }
+        changeSlot();
         return;
       }
 
-      const nameVal = document.getElementById('patientName').value.trim();
-      const emailVal = document.getElementById('patientEmail').value.trim();
-      const phoneVal = document.getElementById('patientPhone').value.trim();
-      const reasonVal = document.getElementById('reason').value.trim();
+      const nameVal = document.getElementById('patientName') ? document.getElementById('patientName').value.trim() : '';
+      const emailVal = document.getElementById('patientEmail') ? document.getElementById('patientEmail').value.trim() : '';
+      const phoneVal = document.getElementById('patientPhone') ? document.getElementById('patientPhone').value.trim() : '';
+      const reasonVal = document.getElementById('reason') ? document.getElementById('reason').value.trim() : '';
 
       const body = {
         slot_id: slotVal,
@@ -1173,25 +1488,39 @@
           reason: reasonVal,
         });
 
+        // Smart Post-Booking Flow: auto-copy booking Reference ID to clipboard
+        if (b && b.id) {
+          copyText(b.id, null);
+        }
+
         // Reset selection & prepare fresh key
         currentIdempotencyKey = crypto.randomUUID();
         selectedSlotId = '';
-        document.getElementById('slotId').value = '';
+        const slotInput = document.getElementById('slotId');
+        if (slotInput) slotInput.value = '';
         const copySlotBtn = document.getElementById('copySlotInputBtn');
         if (copySlotBtn) copySlotBtn.style.display = 'none';
-        const summary = document.getElementById('slotSelectionSummary');
-        if (summary) summary.style.display = 'none';
+        updateSelectedSlotUI('');
+
+        // Smart State Auto-Fill: automatically capture submitted email into Section 3 email filter
+        const searchEmailInput = document.getElementById('searchEmail');
+        if (searchEmailInput && emailVal) {
+          searchEmailInput.value = emailVal;
+        }
 
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
         notify(err.message || 'Unable to reach booking server. Please check API configuration.', 'error');
       } finally {
-        btn.disabled = false;
-        btn.innerHTML = originalBtnHtml;
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalBtnHtml;
+        }
       }
     }
 
+    // Task 3: Render Single Beautiful Success Receipt Card
     // Task 3: Render Single Beautiful Success Receipt Card
     function renderSuccessReceipt(b, context = {}) {
       currentReceiptBooking = b;
@@ -1233,10 +1562,10 @@
         <div class="receipt-ref-box">
           <div class="receipt-ref-label">
             <span>🆔 Booking Reference ID</span>
-            <span style="color:var(--text-secondary); font-size:0.72rem; text-transform:none; font-weight:normal;">One-click copy for easy lookup</span>
+            <span class="receipt-copied-notice">✨ Auto-copied to clipboard</span>
           </div>
           <div class="receipt-ref-value-row">
-            <span class="receipt-ref-value" id="receiptRefId">${b.id}</span>
+            <span class="receipt-ref-value" id="receiptRefId">${escapeHtml(b.id)}</span>
             <button
               type="button"
               class="copy-btn copy-btn-prominent"
@@ -1252,23 +1581,23 @@
         <div class="receipt-grid">
           <div class="receipt-item">
             <div class="receipt-item-label"><span>🩺</span> Doctor Name</div>
-            <div class="receipt-item-value">${doc.name}</div>
+            <div class="receipt-item-value">${escapeHtml(doc.name)}</div>
           </div>
           <div class="receipt-item">
             <div class="receipt-item-label"><span>🔬</span> Specialization</div>
-            <div class="receipt-item-value">${doc.spec || 'General Practice'}</div>
+            <div class="receipt-item-value">${escapeHtml(doc.spec || 'General Practice')}</div>
           </div>
           <div class="receipt-item full-width">
             <div class="receipt-item-label"><span>🕒</span> Appointment Date &amp; Time</div>
-            <div class="receipt-item-value" style="color:var(--cyan);">${apptTime}</div>
+            <div class="receipt-item-value" style="color:var(--cyan);">${escapeHtml(apptTime)}</div>
           </div>
           <div class="receipt-item">
             <div class="receipt-item-label"><span>👤</span> Patient Name</div>
-            <div class="receipt-item-value">${patientName}</div>
+            <div class="receipt-item-value">${escapeHtml(patientName)}</div>
           </div>
           <div class="receipt-item">
             <div class="receipt-item-label"><span>📧</span> Patient Email</div>
-            <div class="receipt-item-value">${patientEmail}</div>
+            <div class="receipt-item-value">${escapeHtml(patientEmail)}</div>
           </div>
           ${slotId ? `
           <div class="receipt-item full-width">
@@ -1289,18 +1618,21 @@
           ${patientPhone ? `
           <div class="receipt-item">
             <div class="receipt-item-label"><span>📱</span> Phone Number</div>
-            <div class="receipt-item-value">${patientPhone}</div>
+            <div class="receipt-item-value">${escapeHtml(patientPhone)}</div>
           </div>` : ''}
           ${reason ? `
           <div class="receipt-item full-width">
             <div class="receipt-item-label"><span>📋</span> Reason for Visit</div>
-            <div class="receipt-item-value">${reason}</div>
+            <div class="receipt-item-value">${escapeHtml(reason)}</div>
           </div>` : ''}
         </div>
 
         <div id="receiptNotice" class="receipt-notice" style="display:none;"></div>
 
         <div class="receipt-actions">
+          <button type="button" class="btn-receipt-action view-bookings" onclick="scrollToBookings()">
+            <span>📋 View in My Bookings ↓</span>
+          </button>
           <button type="button" class="btn-receipt-action primary" onclick="bookAnotherAppointment()">
             <span>+ Book Another</span>
           </button>
@@ -1314,16 +1646,18 @@
       const legacyBody = document.getElementById('confirmationBody');
       if (legacyBody) {
         legacyBody.innerHTML = `
-          <div><strong>Booking ID:</strong> <span class="mono">${b.id}</span></div>
-          <div><strong>Patient:</strong> ${patientName} (${patientEmail})</div>
-          <div><strong>Doctor:</strong> ${doc.name} ${doc.spec ? `(${doc.spec})` : ''}</div>
-          <div><strong>Appointment Time:</strong> ${apptTime}</div>
-          ${slotId ? `<div><strong>Slot ID:</strong> <span class="mono">${slotId}</span></div>` : ''}
-          <div><strong>Status:</strong> <span style="color:var(--emerald);">${status}</span></div>
+          <div><strong>Booking ID:</strong> <span class="mono">${escapeHtml(b.id)}</span></div>
+          <div><strong>Patient:</strong> ${escapeHtml(patientName)} (${escapeHtml(patientEmail)})</div>
+          <div><strong>Doctor:</strong> ${escapeHtml(doc.name)} ${doc.spec ? `(${escapeHtml(doc.spec)})` : ''}</div>
+          <div><strong>Appointment Time:</strong> ${escapeHtml(apptTime)}</div>
+          ${slotId ? `<div><strong>Slot ID:</strong> <span class="mono">${escapeHtml(slotId)}</span></div>` : ''}
+          <div><strong>Status:</strong> <span style="color:var(--emerald);">${escapeHtml(status)}</span></div>
         `;
       }
 
-      box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (typeof box.scrollIntoView === 'function') {
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }
 
     // Quick Action: Book Another
@@ -1336,18 +1670,22 @@
         document.getElementById('reason').value = '';
       }
       selectedSlotId = '';
-      document.getElementById('slotId').value = '';
+      const slotInput = document.getElementById('slotId');
+      if (slotInput) slotInput.value = '';
       const copyBtn = document.getElementById('copySlotInputBtn');
       if (copyBtn) copyBtn.style.display = 'none';
-      const summary = document.getElementById('slotSelectionSummary');
-      if (summary) summary.style.display = 'none';
+      updateSelectedSlotUI('');
 
       currentIdempotencyKey = crypto.randomUUID();
       renderSlots();
 
       const slotsSec = document.getElementById('slotsSection');
       if (slotsSec) {
-        slotsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (typeof slotsSec.scrollIntoView === 'function') {
+          slotsSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        const firstSlot = slotsSec.querySelector('.slot-card');
+        if (firstSlot && typeof firstSlot.focus === 'function') firstSlot.focus();
       }
     }
 
@@ -1362,10 +1700,30 @@
       const id = idInput ? idInput.value.trim() : '';
       const out = document.getElementById('lookupResult');
       if (!id) {
-        if (out) out.innerHTML = `<span style="color:var(--danger); font-size:0.86rem;">Please enter a Booking Reference ID.</span>`;
+        if (out) {
+          out.innerHTML = `
+            <div class="empty-state small error">
+              <span class="empty-state-icon">⚠️</span>
+              <div>
+                <div class="empty-state-title">Reference ID Required</div>
+                <p class="empty-state-desc">Please enter or paste a Booking Reference ID to search.</p>
+              </div>
+            </div>
+          `;
+        }
         return;
       }
-      if (out) out.innerHTML = `<span style="color:var(--muted); font-size:0.86rem;">Searching booking records...</span>`;
+      if (out) {
+        out.innerHTML = `
+          <div class="empty-state small">
+            <span class="empty-state-icon">⏳</span>
+            <div>
+              <div class="empty-state-title">Searching clinic records...</div>
+              <p class="empty-state-desc">Locating booking reference ${escapeHtml(id)}</p>
+            </div>
+          </div>
+        `;
+      }
 
       try {
         const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
@@ -1384,7 +1742,7 @@
           <div class="lookup-card">
             <div class="lookup-header">
               <div>
-                <strong>👤 ${b.name || b.patientName || 'Patient'}</strong>
+                <strong>👤 ${escapeHtml(b.name || b.patientName || 'Patient')}</strong>
                 <span class="status-badge status-${(b.status || '').toLowerCase()}" style="margin-left:0.5rem;">
                   ${(b.status || '').toUpperCase()}
                 </span>
@@ -1394,8 +1752,8 @@
             <div style="font-size:0.84rem; display:flex; flex-direction:column; gap:0.4rem;">
               ${(doc.name !== 'Clinic Physician' || apptTime) ? `
               <div style="color:var(--text); font-weight:500;">
-                <span>🩺 ${doc.name} ${doc.spec ? `(${doc.spec})` : ''}</span>
-                ${apptTime ? ` • <span style="color:var(--cyan);">🕒 ${apptTime}</span>` : ''}
+                <span>🩺 ${escapeHtml(doc.name)} ${doc.spec ? `(${escapeHtml(doc.spec)})` : ''}</span>
+                ${apptTime ? ` • <span style="color:var(--cyan);">🕒 ${escapeHtml(apptTime)}</span>` : ''}
               </div>` : ''}
               <div class="uuid-row">
                 <span style="color:var(--muted);">🆔 Ref ID:</span>
@@ -1403,8 +1761,8 @@
                 <button type="button" class="copy-btn" onclick="copyText('${b.id}', this, event)" title="Copy Reference ID">Copy</button>
               </div>
               <div style="color:var(--text-secondary);">
-                <span>📧 ${b.email || b.patientEmail}</span>
-                ${b.patientPhone ? ` • <span>📱 ${b.patientPhone}</span>` : ''}
+                <span>📧 ${escapeHtml(b.email || b.patientEmail)}</span>
+                ${b.patientPhone ? ` • <span>📱 ${escapeHtml(b.patientPhone)}</span>` : ''}
               </div>
               ${slotId ? `
               <div class="uuid-row">
@@ -1416,7 +1774,17 @@
           </div>
         `;
       } catch (err) {
-        if (out) out.innerHTML = `<span style="color:var(--danger); font-size:0.86rem;">${err.message || 'Unable to locate booking with that ID.'}</span>`;
+        if (out) {
+          out.innerHTML = `
+            <div class="empty-state small error">
+              <span class="empty-state-icon">❓</span>
+              <div>
+                <div class="empty-state-title">No booking found</div>
+                <p class="empty-state-desc">${escapeHtml(err.message || 'No appointment found with that Reference ID. Please check the ID and try again.')}</p>
+              </div>
+            </div>
+          `;
+        }
       }
     }
 
@@ -1432,7 +1800,8 @@
 
     async function fetchBookings(cursor = null) {
       const listEl = document.getElementById('bookingsList');
-      const email = document.getElementById('searchEmail').value.trim();
+      const emailInput = document.getElementById('searchEmail');
+      const email = emailInput ? emailInput.value.trim() : '';
       const qs = new URLSearchParams({ limit: '5' });
       if (email) qs.set('email', email);
       if (cursor) qs.set('cursor', cursor);
@@ -1446,11 +1815,32 @@
 
         const items = Array.isArray(data.bookings) ? data.bookings : (Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []));
         nextCursor = data.nextCursor || data.next_cursor || null;
-        document.getElementById('nextCursorBtn').style.display = nextCursor ? 'inline-block' : 'none';
-        document.getElementById('paginationStats').textContent = `Showing ${items.length} of ${data.total ?? items.length} total`;
+        const nextBtn = document.getElementById('nextCursorBtn');
+        if (nextBtn) nextBtn.style.display = nextCursor ? 'inline-block' : 'none';
+
+        const statsEl = document.getElementById('paginationStats');
+        if (statsEl) {
+          statsEl.textContent = `Showing ${items.length} of ${data.total ?? items.length} total`;
+        }
 
         if (items.length === 0) {
-          listEl.innerHTML = '<p style="color:var(--muted); padding:0.5rem 0;">No bookings found matching criteria.</p>';
+          if (email) {
+            listEl.innerHTML = `
+              <div class="empty-state">
+                <span class="empty-state-icon">📂</span>
+                <div class="empty-state-title">No appointments found for "${escapeHtml(email)}"</div>
+                <p class="empty-state-desc">We couldn't find any bookings matching this email address. Please double-check for typos or complete a new appointment above.</p>
+              </div>
+            `;
+          } else {
+            listEl.innerHTML = `
+              <div class="empty-state">
+                <span class="empty-state-icon">📋</span>
+                <div class="empty-state-title">No appointments found</div>
+                <p class="empty-state-desc">Enter your booking email above or complete a new appointment to view your history.</p>
+              </div>
+            `;
+          }
           return;
         }
 
@@ -1466,13 +1856,13 @@
             <div class="booking-item">
               <div class="booking-info">
                 <div class="booking-header-row">
-                  <span class="booking-patient-name">👤 ${b.name || b.patientName || 'Patient'}</span>
+                  <span class="booking-patient-name">👤 ${escapeHtml(b.name || b.patientName || 'Patient')}</span>
                   <span class="status-badge status-${status}">[${status}]</span>
                 </div>
                 ${(doc.name !== 'Clinic Physician' || apptTime) ? `
                 <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:0.6rem; flex-wrap:wrap;">
-                  <span>🩺 ${doc.name}</span>
-                  ${apptTime ? `<span>🕒 ${apptTime}</span>` : ''}
+                  <span>🩺 ${escapeHtml(doc.name)}</span>
+                  ${apptTime ? `<span>🕒 ${escapeHtml(apptTime)}</span>` : ''}
                 </div>` : ''}
                 <div class="uuid-row">
                   <span class="uuid-badge" title="${b.id}">🆔 ${b.id}</span>
@@ -1525,7 +1915,7 @@
         lookupInput.value = id;
         lookupSingleBooking();
         const sec = document.getElementById('lookupSection');
-        if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (sec && typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
 
@@ -1585,6 +1975,7 @@
     }
 
     // Initialize application
+    updateSelectedSlotUI('');
     fetchSlots();
     loadFirstPage();
   </script>

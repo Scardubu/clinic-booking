@@ -20,13 +20,18 @@ process.on('uncaughtException', (err: any) => {
     err?.code === 'ECONNRESET' ||
     err?.code === 'EPIPE' ||
     err?.code === 'ETIMEDOUT' ||
-    err?.message?.includes('read ECONNRESET');
+    err?.code === 'ECONNREFUSED' ||
+    err?.message?.includes('read ECONNRESET') ||
+    err?.message?.includes('Connection terminated') ||
+    err?.message?.includes('socket hang up') ||
+    err?.message?.includes('terminating connection') ||
+    err?.message?.includes('server closed the connection') ||
+    err?.message?.includes('client has already been released');
   if (isTransient) {
     console.warn('[SERVER_TRANSIENT_WARN] Caught transient socket error:', err.message);
     return;
   }
   console.error('[SERVER_UNCAUGHT_EXCEPTION]', err);
-  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason: any) => {

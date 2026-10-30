@@ -19,14 +19,31 @@ class MockElement {
   constructor(tag, id = '') {
     this.tagName = tag.toUpperCase();
     this.id = id;
-    this.className = '';
+    let _className = '';
     this.classList = {
       _classes: new Set(),
-      add: (...c) => c.forEach(x => this.classList._classes.add(x)),
-      remove: (...c) => c.forEach(x => this.classList._classes.delete(x)),
-      toggle: (c, val) => val ? this.classList._classes.add(c) : this.classList._classes.delete(c),
+      add: (...c) => {
+        c.forEach(x => this.classList._classes.add(x));
+        _className = Array.from(this.classList._classes).join(' ');
+      },
+      remove: (...c) => {
+        c.forEach(x => this.classList._classes.delete(x));
+        _className = Array.from(this.classList._classes).join(' ');
+      },
+      toggle: (c, val) => {
+        val ? this.classList._classes.add(c) : this.classList._classes.delete(c);
+        _className = Array.from(this.classList._classes).join(' ');
+      },
       contains: (c) => this.classList._classes.has(c)
     };
+    Object.defineProperty(this, 'className', {
+      get: () => _className,
+      set: (val) => {
+        _className = String(val);
+        this.classList._classes.clear();
+        _className.split(/\s+/).filter(Boolean).forEach(c => this.classList._classes.add(c));
+      }
+    });
     this.innerHTML = '';
     this.textContent = '';
     this.style = {};
@@ -257,6 +274,104 @@ console.log('=== Running Frontend Verification Tests ===\n');
   assert(html.includes("if(event.target===event.currentTarget && (event.key==='Enter'||event.key===' '))"), 'Slot card checks event.target === event.currentTarget');
   assert(html.includes('onkeydown="event.stopPropagation();"'), 'Copy button stops keydown propagation');
   console.log('[PASS] Test 7: Slot card markup isolates keydown events preventing accidental slot activation when copying');
+}
+
+// Test 8: Selected Slot Summary Card renders Doctor, Specialization, Date/Time and Change button
+{
+  context.window.cachedSlots = [{
+    id: 'slot-xyz-789',
+    provider: 'Dr. Amina Bello (Pediatrics)',
+    start: '2026-11-10T14:30:00Z'
+  }];
+  context.updateSelectedSlotUI('slot-xyz-789');
+  assert(elements.slotSelectionSummary.innerHTML.includes('Dr. Amina Bello'), 'Summary card has Doctor Name');
+  assert(elements.slotSelectionSummary.innerHTML.includes('Pediatrics'), 'Summary card has Specialization');
+  assert(elements.slotSelectionSummary.innerHTML.includes('btn-change-slot'), 'Summary card has Change Slot button');
+  assert(elements.slotSelectionSummary.classList.contains('active'), 'Summary card has active class');
+
+  // Test empty state
+  context.updateSelectedSlotUI('');
+  assert(elements.slotSelectionSummary.innerHTML.includes('No appointment slot selected'), 'Summary card displays friendly empty state');
+  assert(elements.slotSelectionSummary.classList.contains('empty'), 'Summary card has empty class');
+  console.log('[PASS] Test 8: updateSelectedSlotUI() renders human-readable Doctor, Specialization, Date/Time & Change Slot button');
+}
+
+// Test 9: HTML markup hides raw UUID slot input box and provides hidden slotId
+{
+  assert(html.includes('<input type="hidden" id="slotId" name="slotId"'), 'HTML has hidden input for slotId');
+  assert(!html.includes('<input type="text" id="slotId"'), 'HTML does not have raw text input for slotId');
+  console.log('[PASS] Test 9: Section 2 eliminates raw text input box for slotId in favor of hidden input & summary card');
+}
+
+// Test 10: Post-booking flow auto-fills email into Section 3 search input and auto-copies Ref ID
+{
+  const prevFetch = context.fetch;
+  let lastFetchedUrl = '';
+  context.fetch = async (url, opts = {}) => {
+    lastFetchedUrl = url;
+    if (url.includes('/bookings') && opts.method === 'POST') {
+      return {
+        ok: true,
+        status: 201,
+        json: async () => ({
+          booking: {
+            id: 'booking-auto-copy-123',
+            slot_id: 'slot-xyz-789',
+            name: 'Chidi Obi',
+            email: 'chidi@example.com'
+          }
+        })
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ bookings: [] })
+    };
+  };
+
+  elements.slotId.value = 'slot-xyz-789';
+  elements.patientName.value = 'Chidi Obi';
+  elements.patientEmail.value = 'chidi@example.com';
+
+  await context.handleBookSubmit({ preventDefault: () => {} });
+
+  assert.strictEqual(elements.searchEmail.value, 'chidi@example.com', 'Section 3 searchEmail is auto-populated');
+  assert.strictEqual(clipboardText, 'booking-auto-copy-123', 'New booking Ref ID was auto-copied to clipboard');
+  assert(lastFetchedUrl.includes('email=chidi%40example.com') || lastFetchedUrl.includes('email=chidi@example.com'), 'Section 3 bookings fetch was immediately triggered with patient email');
+
+  context.fetch = prevFetch;
+  console.log('[PASS] Test 10: handleBookSubmit() auto-populates email filter, immediately fetches bookings, and auto-copies Ref ID');
+}
+
+// Test 11: Consolidated Success Receipt has prominent "View in My Bookings" shortcut button and auto-copy notice
+{
+  context.renderSuccessReceipt({
+    id: 'booking-receipt-test',
+    slot_id: 'slot-xyz-789',
+    name: 'Adaeze Nwosu',
+    email: 'adaeze@example.com'
+  });
+  assert(elements.confirmationBox.innerHTML.includes('View in My Bookings'), 'Receipt card includes View in My Bookings button');
+  assert(elements.confirmationBox.innerHTML.includes('Auto-copied to clipboard'), 'Receipt card includes Auto-copied notice');
+  console.log('[PASS] Test 11: renderSuccessReceipt() provides "View in My Bookings" shortcut and auto-copied notice');
+}
+
+// Test 12: Friendly empty state messages across Section 3 and Section 4
+{
+  // Test Section 3 empty state when no email is filtered
+  elements.searchEmail.value = '';
+  await context.fetchBookings();
+  assert(elements.bookingsList.innerHTML.includes('Enter your booking email above or complete a new appointment to view your history'), 'Section 3 empty state has welcoming helper text');
+
+  // Test Section 3 empty state when email filter has no results
+  elements.searchEmail.value = 'unknown@example.com';
+  await context.fetchBookings();
+  assert(elements.bookingsList.innerHTML.includes('No appointments found for "unknown@example.com"'), 'Section 3 empty state displays contextual email message');
+
+  // Test Section 4 initial empty state in HTML
+  assert(html.includes('Enter your Booking Reference ID above to retrieve your appointment details'), 'Section 4 has helpful instructional initial state in HTML');
+  console.log('[PASS] Test 12: Section 3 and Section 4 display friendly, instructional empty state messaging');
 }
 
 setTimeout(() => {
