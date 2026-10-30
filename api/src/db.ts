@@ -147,6 +147,12 @@ pool.on('error', (err) => {
   console.warn('[DB_POOL_IDLE_WARN]', err.message);
 });
 
+pool.on('connect', (client) => {
+  client.on('error', (err) => {
+    console.warn('[DB_CLIENT_WARN]', err.message);
+  });
+});
+
 const originalPoolQuery = pool.query.bind(pool);
 (pool as any).query = async function (queryTextOrConfig: any, values?: any, callback?: any) {
   if (typeof values === 'function') {

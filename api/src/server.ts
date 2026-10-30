@@ -15,4 +15,22 @@ async function startServer() {
   });
 }
 
+process.on('uncaughtException', (err: any) => {
+  const isTransient =
+    err?.code === 'ECONNRESET' ||
+    err?.code === 'EPIPE' ||
+    err?.code === 'ETIMEDOUT' ||
+    err?.message?.includes('read ECONNRESET');
+  if (isTransient) {
+    console.warn('[SERVER_TRANSIENT_WARN] Caught transient socket error:', err.message);
+    return;
+  }
+  console.error('[SERVER_UNCAUGHT_EXCEPTION]', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.warn('[SERVER_UNHANDLED_REJECTION]', reason);
+});
+
 startServer();
