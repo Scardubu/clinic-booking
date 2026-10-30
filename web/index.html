@@ -330,6 +330,14 @@
       box-shadow: 0 0 10px rgba(0, 255, 102, 0.45);
       animation: popIn 0.15s ease-out;
     }
+    .copy-btn.copy-failed {
+      color: #fff !important;
+      background: var(--danger) !important;
+      border-color: var(--danger) !important;
+      font-weight: 700;
+      box-shadow: 0 0 10px rgba(255, 77, 109, 0.45);
+      animation: popIn 0.15s ease-out;
+    }
     .copy-btn-prominent {
       padding: 0.4rem 0.85rem;
       font-size: 0.8rem;
@@ -341,6 +349,10 @@
     .copy-btn-prominent:hover {
       background: var(--cyan);
       color: #050608;
+    }
+    .banner .uuid-row {
+      margin: 0 0.35rem;
+      vertical-align: middle;
     }
 
     /* Forms */
@@ -842,11 +854,19 @@
       return h;
     }
 
+    function formatMessageWithUuids(text) {
+      if (typeof text !== 'string') return String(text || '');
+      const uuidRegex = /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/gi;
+      return text.replace(uuidRegex, (match) => {
+        return `<span class="uuid-row"><span class="uuid-badge">${match}</span><button type="button" class="copy-btn" onclick="copyText('${match}', this, event)" onkeydown="event.stopPropagation();" title="Copy ID">Copy</button></span>`;
+      });
+    }
+
     function notify(message, type = 'success') {
       const el = document.getElementById('banner');
       if (!el) return;
       el.className = `banner ${type}`;
-      el.textContent = message;
+      el.innerHTML = formatMessageWithUuids(message);
       el.style.display = 'block';
     }
 
@@ -938,14 +958,31 @@
       }
 
       if (btnElement) {
-        const originalHtml = btnElement.innerHTML;
-        btnElement.innerHTML = 'Copied! ✨';
-        btnElement.classList.add('copied');
-        btnElement.setAttribute('aria-label', 'Copied to clipboard');
-        setTimeout(() => {
-          btnElement.innerHTML = originalHtml;
+        if (!btnElement.dataset.originalHtml) {
+          btnElement.dataset.originalHtml = btnElement.innerHTML;
+        }
+        if (btnElement._copyTimeout) {
+          clearTimeout(btnElement._copyTimeout);
+        }
+
+        if (succeeded) {
+          btnElement.innerHTML = 'Copied! ✨';
+          btnElement.classList.remove('copy-failed');
+          btnElement.classList.add('copied');
+          btnElement.setAttribute('aria-label', 'Copied to clipboard');
+        } else {
+          btnElement.innerHTML = 'Failed ⚠️';
           btnElement.classList.remove('copied');
+          btnElement.classList.add('copy-failed');
+          btnElement.setAttribute('aria-label', 'Copy failed');
+        }
+
+        btnElement._copyTimeout = setTimeout(() => {
+          btnElement.innerHTML = btnElement.dataset.originalHtml || 'Copy';
+          delete btnElement.dataset.originalHtml;
+          btnElement.classList.remove('copied', 'copy-failed');
           btnElement.removeAttribute('aria-label');
+          btnElement._copyTimeout = null;
         }, 2000);
       }
     }
@@ -981,6 +1018,8 @@
         return;
       }
 
+      const prevScroll = grid.scrollTop;
+
       grid.innerHTML = cachedSlots.map(s => {
         const isSelected = s.id === selectedSlotId;
         const dt = formatDateTime(s.start || s.startTime || s.start_time, 'short');
@@ -994,7 +1033,8 @@
             role="button"
             tabindex="0"
             aria-pressed="${isSelected}"
-            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();chooseSlot('${s.id}');}"
+            aria-label="Slot at ${dt} with ${doc.name}"
+            onkeydown="if(event.target===event.currentTarget && (event.key==='Enter'||event.key===' ')){event.preventDefault();chooseSlot('${s.id}');}"
           >
             <div class="slot-card-top">
               <div class="slot-time">
@@ -1016,6 +1056,7 @@
                 type="button"
                 class="copy-btn"
                 onclick="copyText('${s.id}', this, event)"
+                onkeydown="event.stopPropagation();"
                 title="Copy Slot UUID"
                 aria-label="Copy Slot UUID ${s.id.slice(0, 8)}"
               >
@@ -1025,9 +1066,11 @@
           </div>
         `;
       }).join('');
+
+      grid.scrollTop = prevScroll;
     }
 
-    // Task 1: Move selection instantly without network delay
+    // Task 1: Move selection instantly without network delay or scroll jump
     function chooseSlot(id) {
       selectedSlotId = id;
       const input = document.getElementById('slotId');
@@ -1046,7 +1089,31 @@
       }
 
       currentIdempotencyKey = crypto.randomUUID();
-      renderSlots();
+
+      // Smooth in-place update of slot cards without recreating DOM elements, preserving scroll position and keyboard focus
+      const grid = document.getElementById('slotsGrid');
+      if (grid) {
+        const cards = grid.querySelectorAll('.slot-card');
+        cards.forEach(card => {
+          const cardId = card.getAttribute('data-slot-id');
+          const isSelected = cardId === id;
+          card.classList.toggle('selected', isSelected);
+          card.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+
+          const topRow = card.querySelector('.slot-card-top');
+          let badge = card.querySelector('.slot-badge-selected');
+          if (isSelected) {
+            if (!badge && topRow) {
+              const b = document.createElement('span');
+              b.className = 'slot-badge-selected';
+              b.textContent = '✓ Selected';
+              topRow.appendChild(b);
+            }
+          } else if (badge) {
+            badge.remove();
+          }
+        });
+      }
     }
 
     // Task 3: Consolidated Success Receipt Card & Submission Handler
@@ -1131,7 +1198,8 @@
       const box = document.getElementById('confirmationBox');
       if (!box) return;
 
-      const matchedSlot = cachedSlots.find(s => s.id === (b.slot_id || b.slotId || context.slotId));
+      const slotId = b.slot_id || b.slotId || (b.slot && b.slot.id) || context.slotId || '';
+      const matchedSlot = cachedSlots.find(s => s.id === slotId);
       const doc = parseDoctorInfo(
         b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name ||
         matchedSlot?.provider || matchedSlot?.doctorName || matchedSlot?.doctor_name ||
@@ -1202,6 +1270,22 @@
             <div class="receipt-item-label"><span>📧</span> Patient Email</div>
             <div class="receipt-item-value">${patientEmail}</div>
           </div>
+          ${slotId ? `
+          <div class="receipt-item full-width">
+            <div class="receipt-item-label"><span>📅</span> Slot UUID</div>
+            <div class="receipt-item-value uuid-row" style="margin-top:0.25rem;">
+              <span class="uuid-badge">${slotId}</span>
+              <button
+                type="button"
+                class="copy-btn"
+                onclick="copyText('${slotId}', this, event)"
+                title="Copy Slot UUID"
+                aria-label="Copy Slot UUID"
+              >
+                Copy
+              </button>
+            </div>
+          </div>` : ''}
           ${patientPhone ? `
           <div class="receipt-item">
             <div class="receipt-item-label"><span>📱</span> Phone Number</div>
@@ -1225,6 +1309,19 @@
           </button>
         </div>
       `;
+
+      // Backwards-compatibility sync for confirmationBody
+      const legacyBody = document.getElementById('confirmationBody');
+      if (legacyBody) {
+        legacyBody.innerHTML = `
+          <div><strong>Booking ID:</strong> <span class="mono">${b.id}</span></div>
+          <div><strong>Patient:</strong> ${patientName} (${patientEmail})</div>
+          <div><strong>Doctor:</strong> ${doc.name} ${doc.spec ? `(${doc.spec})` : ''}</div>
+          <div><strong>Appointment Time:</strong> ${apptTime}</div>
+          ${slotId ? `<div><strong>Slot ID:</strong> <span class="mono">${slotId}</span></div>` : ''}
+          <div><strong>Status:</strong> <span style="color:var(--emerald);">${status}</span></div>
+        `;
+      }
 
       box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
@@ -1255,50 +1352,8 @@
     }
 
     // Quick Action: Cancel Booking from Receipt
-    async function cancelReceiptBooking(id) {
-      if (!confirm('Are you sure you want to cancel this booking? This will reopen the slot immediately.')) {
-        return;
-      }
-      const cancelBtn = document.getElementById('receiptCancelBtn');
-      if (cancelBtn) {
-        cancelBtn.disabled = true;
-        cancelBtn.innerHTML = '<span>Cancelling...</span>';
-      }
-
-      try {
-        const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: buildHeaders(),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(getErrorMessage(res, data));
-
-        const badge = document.getElementById('receiptStatusBadge');
-        if (badge) {
-          badge.className = 'status-badge status-cancelled';
-          badge.textContent = '✕ CANCELLED';
-        }
-
-        if (cancelBtn) {
-          cancelBtn.innerHTML = '<span>Cancelled</span>';
-          cancelBtn.disabled = true;
-        }
-
-        const notice = document.getElementById('receiptNotice');
-        if (notice) {
-          notice.textContent = `Booking ${id} was cancelled. The slot is now available again.`;
-          notice.style.display = 'block';
-        }
-
-        await fetchSlots();
-        await loadFirstPage();
-      } catch (err) {
-        alert(err.message || 'Unable to cancel booking.');
-        if (cancelBtn) {
-          cancelBtn.disabled = false;
-          cancelBtn.innerHTML = '<span>✕ Cancel Booking</span>';
-        }
-      }
+    function cancelReceiptBooking(id) {
+      cancelBooking(id);
     }
 
     // Section 4: Look Up Single Booking with Copyable UUIDs
@@ -1320,6 +1375,10 @@
         if (!res.ok) throw new Error(getErrorMessage(res, data));
         const b = data.booking || data;
         const isConfirmed = (b.status || '').toLowerCase() === 'confirmed';
+        const slotId = b.slot_id || b.slotId || (b.slot && b.slot.id) || '';
+        const rawStart = b.slot?.start || b.slot?.startTime || b.start_time || b.start;
+        const apptTime = rawStart ? formatDateTime(rawStart, 'long') : '';
+        const doc = parseDoctorInfo(b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name || b.provider || b.doctor_name);
 
         out.innerHTML = `
           <div class="lookup-card">
@@ -1333,6 +1392,11 @@
               ${isConfirmed ? `<button type="button" class="btn-danger" onclick="cancelBooking('${b.id}')">Cancel</button>` : ''}
             </div>
             <div style="font-size:0.84rem; display:flex; flex-direction:column; gap:0.4rem;">
+              ${(doc.name !== 'Clinic Physician' || apptTime) ? `
+              <div style="color:var(--text); font-weight:500;">
+                <span>🩺 ${doc.name} ${doc.spec ? `(${doc.spec})` : ''}</span>
+                ${apptTime ? ` • <span style="color:var(--cyan);">🕒 ${apptTime}</span>` : ''}
+              </div>` : ''}
               <div class="uuid-row">
                 <span style="color:var(--muted);">🆔 Ref ID:</span>
                 <span class="uuid-badge">${b.id}</span>
@@ -1342,11 +1406,11 @@
                 <span>📧 ${b.email || b.patientEmail}</span>
                 ${b.patientPhone ? ` • <span>📱 ${b.patientPhone}</span>` : ''}
               </div>
-              ${(b.slot_id || b.slotId) ? `
+              ${slotId ? `
               <div class="uuid-row">
                 <span style="color:var(--muted);">📅 Slot ID:</span>
-                <span class="uuid-badge">${b.slot_id || b.slotId}</span>
-                <button type="button" class="copy-btn" onclick="copyText('${b.slot_id || b.slotId}', this, event)" title="Copy Slot UUID">Copy</button>
+                <span class="uuid-badge">${slotId}</span>
+                <button type="button" class="copy-btn" onclick="copyText('${slotId}', this, event)" title="Copy Slot UUID">Copy</button>
               </div>` : ''}
             </div>
           </div>
@@ -1393,6 +1457,10 @@
         listEl.innerHTML = items.map(b => {
           const status = (b.status || 'confirmed').toLowerCase();
           const isConfirmed = status === 'confirmed';
+          const slotId = b.slot_id || b.slotId || (b.slot && b.slot.id) || '';
+          const rawStart = b.slot?.start || b.slot?.startTime || b.start_time || b.start;
+          const apptTime = rawStart ? formatDateTime(rawStart, 'short') : '';
+          const doc = parseDoctorInfo(b.slot?.provider || b.slot?.doctorName || b.slot?.doctor_name || b.provider || b.doctor_name);
 
           return `
             <div class="booking-item">
@@ -1401,6 +1469,11 @@
                   <span class="booking-patient-name">👤 ${b.name || b.patientName || 'Patient'}</span>
                   <span class="status-badge status-${status}">[${status}]</span>
                 </div>
+                ${(doc.name !== 'Clinic Physician' || apptTime) ? `
+                <div style="font-size:0.8rem; color:var(--text-secondary); display:flex; gap:0.6rem; flex-wrap:wrap;">
+                  <span>🩺 ${doc.name}</span>
+                  ${apptTime ? `<span>🕒 ${apptTime}</span>` : ''}
+                </div>` : ''}
                 <div class="uuid-row">
                   <span class="uuid-badge" title="${b.id}">🆔 ${b.id}</span>
                   <button
@@ -1412,6 +1485,16 @@
                   >
                     Copy
                   </button>
+                  ${slotId ? `
+                  <button
+                    type="button"
+                    class="copy-btn"
+                    onclick="copyText('${slotId}', this, event)"
+                    title="Copy Slot UUID: ${slotId}"
+                    aria-label="Copy Slot UUID ${slotId.slice(0, 8)}"
+                  >
+                    Slot ID
+                  </button>` : ''}
                   <button
                     type="button"
                     class="btn-outline"
@@ -1450,6 +1533,12 @@
       if (!confirm(`Are you sure you want to cancel booking ${id}?`)) {
         return;
       }
+      const receiptCancelBtn = document.getElementById('receiptCancelBtn');
+      if (currentReceiptBooking && currentReceiptBooking.id === id && receiptCancelBtn) {
+        receiptCancelBtn.disabled = true;
+        receiptCancelBtn.innerHTML = '<span>Cancelling...</span>';
+      }
+
       try {
         const res = await fetch(`${API_BASE}/bookings/${encodeURIComponent(id)}`, {
           method: 'DELETE',
@@ -1467,10 +1556,9 @@
             badge.className = 'status-badge status-cancelled';
             badge.textContent = '✕ CANCELLED';
           }
-          const cancelBtn = document.getElementById('receiptCancelBtn');
-          if (cancelBtn) {
-            cancelBtn.innerHTML = '<span>Cancelled</span>';
-            cancelBtn.disabled = true;
+          if (receiptCancelBtn) {
+            receiptCancelBtn.innerHTML = '<span>Cancelled</span>';
+            receiptCancelBtn.disabled = true;
           }
           const notice = document.getElementById('receiptNotice');
           if (notice) {
@@ -1479,10 +1567,20 @@
           }
         }
 
+        // If lookup section contains this booking, refresh it to show cancelled
+        const lookupInput = document.getElementById('lookupId');
+        if (lookupInput && lookupInput.value.trim() === id) {
+          lookupSingleBooking();
+        }
+
         await fetchSlots();
         await loadFirstPage();
       } catch (err) {
         notify(err.message || 'Unable to reach booking server. Please check API configuration.', 'error');
+        if (currentReceiptBooking && currentReceiptBooking.id === id && receiptCancelBtn) {
+          receiptCancelBtn.disabled = false;
+          receiptCancelBtn.innerHTML = '<span>✕ Cancel Booking</span>';
+        }
       }
     }
 
