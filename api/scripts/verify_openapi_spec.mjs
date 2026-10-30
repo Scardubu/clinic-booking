@@ -37,14 +37,44 @@ async function request(path, options = {}) {
   return { status: res.status, headers: res.headers, data };
 }
 
+async function ensureServerRunning() {
+  if (BASE_URL.includes('localhost') || BASE_URL.includes('127.0.0.1')) {
+    try {
+      const ping = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+      if (ping.ok) return null;
+    } catch {
+      console.log('   [INFO] Local backend inactive on port 4000. Automatically spawning server...');
+      const { spawn } = await import('node:child_process');
+      const proc = spawn(process.execPath, [path.resolve(__dirname, '../dist/server.js')], {
+        stdio: 'inherit',
+      });
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+          if (res.ok) {
+            console.log('   [INFO] Local server is healthy and ready for tests.\n');
+            return proc;
+          }
+        } catch {}
+      }
+      proc.kill();
+      throw new Error('Failed to bootstrap local server within 15 seconds.');
+    }
+  }
+  return null;
+}
+
 async function runSpecVerification() {
   console.log('\n======================================================');
   console.log('--- STRICT OPENAPI SPECIFICATION VERIFICATION SUITE ---');
   console.log('Target:', BASE_URL);
   console.log('======================================================\n');
 
-  // Step 1: POST /reset with exact spec payload
-  console.log('1. Testing POST /reset with custom slots (including past slot)...');
+  const serverProc = await ensureServerRunning();
+  try {
+    // Step 1: POST /reset with exact spec payload
+    console.log('1. Testing POST /reset with custom slots (including past slot)...');
   
   // Test reset with empty array leaves exactly 0 slots
   const emptyResetRes = await request('/reset', {
@@ -327,6 +357,11 @@ async function runSpecVerification() {
   console.log('\n======================================================');
   console.log('--- ALL OPENAPI SPECIFICATION REQUIREMENTS PASSED! ---');
   console.log('======================================================\n');
+  } finally {
+    if (serverProc) {
+      serverProc.kill();
+    }
+  }
 }
 
 runSpecVerification().catch((err) => {

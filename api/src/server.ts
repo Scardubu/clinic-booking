@@ -1,6 +1,6 @@
 import { app } from './app.js';
 import { config } from './config.js';
-import { initDb } from './db.js';
+import { initDb, isTransientDbError } from './db.js';
 
 async function startServer() {
   try {
@@ -16,18 +16,7 @@ async function startServer() {
 }
 
 process.on('uncaughtException', (err: any) => {
-  const isTransient =
-    err?.code === 'ECONNRESET' ||
-    err?.code === 'EPIPE' ||
-    err?.code === 'ETIMEDOUT' ||
-    err?.code === 'ECONNREFUSED' ||
-    err?.message?.includes('read ECONNRESET') ||
-    err?.message?.includes('Connection terminated') ||
-    err?.message?.includes('socket hang up') ||
-    err?.message?.includes('terminating connection') ||
-    err?.message?.includes('server closed the connection') ||
-    err?.message?.includes('client has already been released');
-  if (isTransient) {
+  if (isTransientDbError(err) || err?.message?.includes('client has already been released')) {
     console.warn('[SERVER_TRANSIENT_WARN] Caught transient socket error:', err.message);
     return;
   }

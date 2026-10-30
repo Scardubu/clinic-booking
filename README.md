@@ -377,7 +377,7 @@ npx serve .
 The platform includes four verification suites covering end-to-end functionality, concurrency guarantees, and UX accessibility:
 
 ```bash
-# Run all test suites sequentially from the root
+# Run all test suites sequentially from the root (zero-config: automatically spawns local backend if inactive)
 npm test
 
 # OR run individual suites:
@@ -394,7 +394,9 @@ npm run test:deep
 npm run test:frontend
 ```
 
-> ⚠️ **Warning:** Test suites execute `POST /reset` to create clean testing baselines. Never point automated test scripts at a production database.
+> 💡 **Self-Contained Automated Testing:** The test harness includes auto-bootstrap hooks that detect whether a local backend is active on port 4000. If inactive, it automatically compiles and spawns the backend server, verifies health, executes the test suite, and cleanly terminates the child process upon completion.
+> 
+> ⚠️ **Warning:** Test suites execute `POST /reset` to create clean testing baselines. Automated test scripts run against local instances or test scopes.
 
 ---
 

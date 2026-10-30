@@ -40,15 +40,45 @@ async function request(path, options = {}) {
   return { status: res.status, headers: res.headers, data };
 }
 
+async function ensureServerRunning() {
+  if (BASE_URL.includes('localhost') || BASE_URL.includes('127.0.0.1')) {
+    try {
+      const ping = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+      if (ping.ok) return null;
+    } catch {
+      console.log('   [INFO] Local backend inactive on port 4000. Automatically spawning server...');
+      const { spawn } = await import('node:child_process');
+      const proc = spawn(process.execPath, [path.resolve(__dirname, '../dist/server.js')], {
+        stdio: 'inherit',
+      });
+      for (let i = 0; i < 30; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        try {
+          const res = await fetch(`${BASE_URL}/health`, { signal: AbortSignal.timeout(1000) });
+          if (res.ok) {
+            console.log('   [INFO] Local server is healthy and ready for tests.\n');
+            return proc;
+          }
+        } catch {}
+      }
+      proc.kill();
+      throw new Error('Failed to bootstrap local server within 15 seconds.');
+    }
+  }
+  return null;
+}
+
 async function runConformance() {
   console.log(`\n=== Running Clinic Booking API Conformance Suite (Levels 1–5) ===`);
   console.log(`Target: ${BASE_URL}\n`);
 
-  // 0. RESET: Initialize clean state
-  console.log('-> Testing Level 1: Reset Database State...');
-  const resetRes = await request('/reset', { method: 'POST' });
-  assert.equal(resetRes.status, 200, 'POST /reset must return 200');
-  console.log('   [PASS] POST /reset completed.');
+  const serverProc = await ensureServerRunning();
+  try {
+    // 0. RESET: Initialize clean state
+    console.log('-> Testing Level 1: Reset Database State...');
+    const resetRes = await request('/reset', { method: 'POST' });
+    assert.equal(resetRes.status, 200, 'POST /reset must return 200');
+    console.log('   [PASS] POST /reset completed.');
 
   // 1. LEVEL 2: Auth & Payload Validation
   console.log('-> Testing Level 2: API Key Auth & Validation...');
@@ -214,6 +244,11 @@ async function runConformance() {
   assert.notEqual(otherRes.status, 429, 'Other emails must not be affected by rate limiting');
   console.log('   [PASS] Level 5 verified.\n');
   console.log('=== ALL 5 LEVELS PASSED CONFORMANCE SUCCESSFULLY ===\n');
+  } finally {
+    if (serverProc) {
+      serverProc.kill();
+    }
+  }
 }
 
 runConformance().catch((err) => {
