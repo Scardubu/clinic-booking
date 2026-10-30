@@ -10,6 +10,17 @@ web/   static page + one Vercel function (API proxy)  ->  deployed on Vercel (fr
        Postgres on Neon (free)
 ```
 
+## Live deployment
+
+| Item | URL |
+|---|---|
+| API base URL (Render) | https://clinic-booking-api-od9i.onrender.com |
+| Health check | https://clinic-booking-api-od9i.onrender.com/health |
+| Web page (Vercel) | https://clinic-booking-web-mu.vercel.app/ |
+| Source | https://github.com/Scardubu/clinic-booking |
+
+> Render's free tier sleeps after ~15 minutes idle (cold start ≈ 50s); point an uptime pinger at `/health`.
+
 ## What's where
 
 | Level | Requirement | Where it lives |
@@ -101,11 +112,11 @@ npm run test:deep               # deep skeptical verification of proxy & unit he
    Root directory `api`, Build `npm ci --include=dev && npm run build`, Start `node dist/server.js`,
    Health check path `/health`, Region matching Neon.
 3. Environment: `API_KEY` = your API key, `DATABASE_URL` = Neon pooled string, `NODE_VERSION` = `22`.
-4. Deploy. Check `https://<service>.onrender.com/health` returns `{"status":"ok"}`.
+4. Deploy. Check `https://clinic-booking-api-od9i.onrender.com/health` returns `{"status":"ok"}`.
 
 ### 3. Vercel (web page)
 1. New Project -> same repo -> **Root Directory: `web`** -> Framework: Other (no build command).
-2. Environment variables: `API_BASE_URL` = `https://<service>.onrender.com` (no trailing slash), `API_KEY` = the same key.
+2. Environment variables: `API_BASE_URL` = `https://clinic-booking-api-od9i.onrender.com` (no trailing slash), `API_KEY` = the same key.
 3. Deploy, open the URL, confirm slots load and a booking works end to end.
 
 ### 4. Final checks, then hands off
@@ -115,9 +126,9 @@ npm run test:deep               # deep skeptical verification of proxy & unit he
 
 ## Submission checklist
 
-- [x] **API base URL**: `https://<service>.onrender.com` (or proxy endpoint)
+- [x] **API base URL**: `https://clinic-booking-api-od9i.onrender.com`
 - [x] **API key**: `koya_live_9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c` (matches configured key)
-- [x] **Web page URL**: Vercel deployed URL
+- [x] **Web page URL**: `https://clinic-booking-web-mu.vercel.app/`
 - [x] **GitHub repo**: `https://github.com/Scardubu/clinic-booking` (public, or invite `quadri40`)
 - [x] **Loom (<= 5 min)**: page working + code walkthrough + note on how far we got (all 5 levels) and two biggest decisions
 - [x] Uptime monitor is live on `/health`
